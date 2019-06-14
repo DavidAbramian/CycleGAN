@@ -38,7 +38,7 @@ class CycleGAN():
 
         data = load_data(subfolder=image_folder)
 
-        self.channels = data["nr_of_channels"]
+        self.channels = data["nr_of_channels_A"]
         self.img_shape = data["image_size_A"] + (self.channels,)
         
         self.channels_A = data["nr_of_channels_A"]
@@ -47,7 +47,8 @@ class CycleGAN():
         self.channels_B = data["nr_of_channels_B"]
         self.img_shape_B = data["image_size_B"] + (self.channels_B,)
 
-        print('Image shape: ', self.img_shape)
+        print('Image A shape: ', self.img_shape_A)
+        print('Image B shape: ', self.img_shape_B)
 
         self.A_train = data["trainA_images"]
         self.B_train = data["trainB_images"]
@@ -103,12 +104,12 @@ class CycleGAN():
         self.opt_G = Adam(self.learning_rate_G, self.beta_1, self.beta_2)
 
         # Build discriminators
-        D_A = self.build_discriminator()
-        D_B = self.build_discriminator()
+        D_A = self.build_discriminator(self.img_shape_A)
+        D_B = self.build_discriminator(self.img_shape_B)
 
         # Define discriminator models
-        image_A = Input(shape=self.img_shape)
-        image_B = Input(shape=self.img_shape)
+        image_A = Input(shape=self.img_shape_A)
+        image_B = Input(shape=self.img_shape_B)
         guess_A = D_A(image_A)
         guess_B = D_B(image_B)
         self.D_A = Model(inputs=image_A, outputs=guess_A, name='D_A_model')
@@ -132,12 +133,12 @@ class CycleGAN():
         self.D_B_static.trainable = False
 
         # Build generators
-        self.G_A2B = self.build_generator(name='G_A2B_model')
-        self.G_B2A = self.build_generator(name='G_B2A_model')
+        self.G_A2B = self.build_generator(self.img_shape_A, self.img_shape_B, name='G_A2B_model')
+        self.G_B2A = self.build_generator(self.img_shape_B, self.img_shape_A, name='G_B2A_model')
 
         # Define full CycleGAN model, used for training the generators
-        real_A = Input(shape=self.img_shape, name='real_A')
-        real_B = Input(shape=self.img_shape, name='real_B')
+        real_A = Input(shape=self.img_shape_A, name='real_A')
+        real_B = Input(shape=self.img_shape_B, name='real_B')
         synthetic_B = self.G_A2B(real_A)
         synthetic_A = self.G_B2A(real_B)
         dB_guess_synthetic = self.D_B_static(synthetic_B)
@@ -251,9 +252,9 @@ class CycleGAN():
 #===============================================================================
 # Models
 
-    def build_discriminator(self, name=None):
+    def build_discriminator(self, img_shape, name=None):
         # Input
-        input_img = Input(shape=self.img_shape)
+        input_img = Input(shape=img_shape)
 
         # Layers 1-4
         x = self.ck(input_img, 64, False, True) #  Instance normalization is not used for this layer)
@@ -273,9 +274,9 @@ class CycleGAN():
 
         return Model(inputs=input_img, outputs=x, name=name)
 
-    def build_generator(self, name=None):
+    def build_generator(self, img_shape_in, img_shape_out, name=None):
         # Layer 1: Input
-        input_img = Input(shape=self.img_shape)
+        input_img = Input(shape=img_shape_in)
         x = ReflectionPadding2D((3, 3))(input_img)
         x = self.c7Ak(x, 32)
 
@@ -293,7 +294,7 @@ class CycleGAN():
 
         # Layer 15: Output
         x = ReflectionPadding2D((3, 3))(x)
-        x = Conv2D(self.channels, kernel_size=7, strides=1, padding='valid', use_bias=True)(x)
+        x = Conv2D(filters=img_shape_out[-1], kernel_size=7, strides=1, padding='valid', use_bias=True)(x)
         x = Activation('tanh')(x)
 
         return Model(inputs=input_img, outputs=x, name=name)
@@ -624,7 +625,8 @@ class CycleGAN():
         data = {}
         data['meta_data'] = []
         data['meta_data'].append({
-            'img shape: height,width,channels': self.img_shape,
+            'img shape_A: height,width,channels': self.img_shape_A,
+            'img shape_B: height,width,channels': self.img_shape_B,
             'batch size': self.batch_size,
             'save training img interval': self.save_training_img_interval,
             'normalization function': str(self.normalization),
