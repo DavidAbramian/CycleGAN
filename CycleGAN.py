@@ -8,10 +8,7 @@ from keras.models import Model, model_from_json
 from keras.utils import plot_model
 from keras.engine.topology import Network
 
-# from collections import OrderedDict
-# from scipy.misc import toimage  # has depricated
 import matplotlib.image as mpimage
-# import cv2
 import numpy as np
 import datetime
 import time
@@ -31,15 +28,12 @@ os.environ["CUDA_VISIBLE_DEVICES"]="1"
 # np.random.seed(seed=12345)
 
 class CycleGAN():
-    def __init__(self, image_folder='retina'):
+    def __init__(self, image_folder='retina2'):
 
         # ======= Data ==========
         print('--- Caching data ---')
 
         data = load_data(subfolder=image_folder)
-
-        self.channels = data["nr_of_channels_A"]
-        self.img_shape = data["image_size_A"] + (self.channels,)
         
         self.channels_A = data["nr_of_channels_A"]
         self.img_shape_A = data["image_size_A"] + (self.channels_A,)
@@ -71,7 +65,7 @@ class CycleGAN():
         self.synthetic_pool_size = 50  # Size of image pools used for training the discriminators
         self.beta_1 = 0.5  # Adam parameter
         self.beta_2 = 0.999  # Adam parameter
-        self.batch_size = 5  # Number of images per batch
+        self.batch_size = 3  # Number of images per batch
         self.epochs = 200  # choose multiples of 20 since the models are saved each 20th epoch
 
         self.save_models = False  # Save or not the generator and discriminator models
@@ -493,11 +487,12 @@ class CycleGAN():
         image = np.hstack(images)
 
         # Save images
-        if self.channels == 1:
+        if image.shape[2] == 1:
             image = image[:, :, 0]
-
-        # toimage(image, cmin=-1, cmax=1).save(save_path)
-        mpimage.imsave(save_path, image, vmin=-1, vmax=1, cmap='gray')
+            mpimage.imsave(save_path, image, vmin=-1, vmax=1, cmap='gray')
+        else:
+            image = (image+1) / 2
+            mpimage.imsave(save_path, image)
 
     def save_epoch_images(self, epoch, num_saved_images=1):
         # Save training images
@@ -513,12 +508,29 @@ class CycleGAN():
         synthetic_image_A = self.G_B2A.predict(real_image_B[np.newaxis])[0]
         reconstructed_image_A = self.G_B2A.predict(synthetic_image_B[np.newaxis])[0]
         reconstructed_image_B = self.G_A2B.predict(synthetic_image_A[np.newaxis])[0]
+        
+        # Add dimensions if A and B have different number of channels
+        if self.channels_A == 1 and self.channels_B == 3:
+            real_image_A = np.tile(real_image_A, [1,1,3])
+            synthetic_image_A = np.tile(synthetic_image_A, [1,1,3])
+            reconstructed_image_A = np.tile(reconstructed_image_A, [1,1,3])
+        elif self.channels_B == 1 and self.channels_A == 3:
+            real_image_B = np.tile(real_image_B, [1,1,3])
+            synthetic_image_B = np.tile(synthetic_image_B, [1,1,3])
+            reconstructed_image_B = np.tile(reconstructed_image_B, [1,1,3])
 
         save_path_A = '{}/train_A/epoch{}.png'.format(self.out_dir, epoch)
         save_path_B = '{}/train_B/epoch{}.png'.format(self.out_dir, epoch)
         if self.paired_data:
             real_image_Ab = self.B_train[rand_ind_A]
             real_image_Ba = self.A_train[rand_ind_B]
+            
+            # Add dimensions if A and B have different number of channels
+            if self.channels_A == 1 and self.channels_B == 3:
+                real_image_Ba = np.tile(real_image_Ba, [1,1,3])
+            elif self.channels_B == 1 and self.channels_A == 3:
+                real_image_Ab = np.tile(real_image_Ab, [1,1,3])
+            
             self.join_and_save((real_image_Ab, real_image_A, synthetic_image_B, reconstructed_image_A), save_path_A)
             self.join_and_save((real_image_Ba, real_image_B, synthetic_image_A, reconstructed_image_B), save_path_B)
         else:
@@ -533,11 +545,28 @@ class CycleGAN():
         reconstructed_image_A = self.G_B2A.predict(synthetic_image_B[np.newaxis])[0]
         reconstructed_image_B = self.G_A2B.predict(synthetic_image_A[np.newaxis])[0]
 
+        # Add dimensions if A and B have different number of channels
+        if self.channels_A == 1 and self.channels_B == 3:
+            real_image_A = np.tile(real_image_A, [1,1,3])
+            synthetic_image_A = np.tile(synthetic_image_A, [1,1,3])
+            reconstructed_image_A = np.tile(reconstructed_image_A, [1,1,3])
+        elif self.channels_B == 1 and self.channels_A == 3:
+            real_image_B = np.tile(real_image_B, [1,1,3])
+            synthetic_image_B = np.tile(synthetic_image_B, [1,1,3])
+            reconstructed_image_B = np.tile(reconstructed_image_B, [1,1,3])
+
         save_path_A = '{}/test_A/epoch{}.png'.format(self.out_dir, epoch)
         save_path_B = '{}/test_B/epoch{}.png'.format(self.out_dir, epoch)
         if self.paired_data:
             real_image_Ab = self.B_test[0]
             real_image_Ba = self.A_test[0]
+            
+            # Add dimensions if A and B have different number of channels
+            if self.channels_A == 1 and self.channels_B == 3:
+                real_image_Ba = np.tile(real_image_Ba, [1,1,3])
+            elif self.channels_B == 1 and self.channels_A == 3:
+                real_image_Ab = np.tile(real_image_Ab, [1,1,3])
+            
             self.join_and_save((real_image_Ab, real_image_A, synthetic_image_B, reconstructed_image_A), save_path_A)
             self.join_and_save((real_image_Ba, real_image_B, synthetic_image_A, reconstructed_image_B), save_path_B)
         else:
@@ -549,6 +578,16 @@ class CycleGAN():
             reconstructed_image_A = self.G_B2A.predict(synthetic_image_B[np.newaxis])[0]
             reconstructed_image_B = self.G_A2B.predict(synthetic_image_A[np.newaxis])[0]
 
+            # Add dimensions if A and B have different number of channels
+            if self.channels_A == 1 and self.channels_B == 3:
+                real_image_A = np.tile(real_image_A, [1,1,3])
+                synthetic_image_A = np.tile(synthetic_image_A, [1,1,3])
+                reconstructed_image_A = np.tile(reconstructed_image_A, [1,1,3])
+            elif self.channels_B == 1 and self.channels_A == 3:
+                real_image_B = np.tile(real_image_B, [1,1,3])
+                synthetic_image_B = np.tile(synthetic_image_B, [1,1,3])
+                reconstructed_image_B = np.tile(reconstructed_image_B, [1,1,3])
+            
             real_images = np.vstack((real_image_A, real_image_B))
             synthetic_images = np.vstack((synthetic_image_B, synthetic_image_A))
             reconstructed_images = np.vstack((reconstructed_image_A, reconstructed_image_B))
@@ -655,41 +694,41 @@ class CycleGAN():
         with open('{}/meta_data.json'.format(self.out_dir), 'w') as outfile:
             json.dump(data, outfile, sort_keys=True)
 
-    def load_model_and_weights(self, model):
-        path_to_model = os.path.join('generate_images', 'models', '{}.json'.format(model.name))
-        path_to_weights = os.path.join('generate_images', 'models', '{}.hdf5'.format(model.name))
-        #model = model_from_json(path_to_model)
-        model.load_weights(path_to_weights)
+    # def load_model_and_weights(self, model):
+    #     path_to_model = os.path.join('generate_images', 'models', '{}.json'.format(model.name))
+    #     path_to_weights = os.path.join('generate_images', 'models', '{}.hdf5'.format(model.name))
+    #     #model = model_from_json(path_to_model)
+    #     model.load_weights(path_to_weights)
 
-    def load_model_and_generate_synthetic_images(self):
-        self.load_model_and_weights(self.G_A2B)
-        self.load_model_and_weights(self.G_B2A)
-        synthetic_images_B = self.G_A2B.predict(self.A_test)
-        synthetic_images_A = self.G_B2A.predict(self.B_test)
+   ##   def load_model_and_generate_synthetic_images(self):
+    #     self.load_model_and_weights(self.G_A2B)
+    #     self.load_model_and_weights(self.G_B2A)
+    #     synthetic_images_B = self.G_A2B.predict(self.A_test)
+    #     synthetic_images_A = self.G_B2A.predict(self.B_test)
 
-        def save_image(image, name, domain):
-            if self.channels == 1:
-                image = image[:, :, 0]
-            # image = image.clip(min=0)
-            toimage(image, cmin=-1, cmax=1).save(os.path.join(
-                'generate_images', 'synthetic_images', domain, name))
+   ##       def save_image(image, name, domain):
+    #         if self.channels == 1:
+    #             image = image[:, :, 0]
+    #         # image = image.clip(min=0)
+    #         toimage(image, cmin=-1, cmax=1).save(os.path.join(
+    #             'generate_images', 'synthetic_images', domain, name))
 
-        # Test A images
-        for i in range(len(synthetic_images_A)):
-            # Get the name from the image it was conditioned on
-            name = self.testB_image_names[i].strip('.png') + '_synthetic.png'
-            synt_A = synthetic_images_A[i]
-            save_image(synt_A, name, 'A')
+   ##       # Test A images
+    #     for i in range(len(synthetic_images_A)):
+    #         # Get the name from the image it was conditioned on
+    #         name = self.testB_image_names[i].strip('.png') + '_synthetic.png'
+    #         synt_A = synthetic_images_A[i]
+    #         save_image(synt_A, name, 'A')
 
-        # Test B images
-        for i in range(len(synthetic_images_B)):
-            # Get the name from the image it was conditioned on
-            name = self.testA_image_names[i].strip('.png') + '_synthetic.png'
-            synt_B = synthetic_images_B[i]
-            save_image(synt_B, name, 'B')
+   ##       # Test B images
+    #     for i in range(len(synthetic_images_B)):
+    #         # Get the name from the image it was conditioned on
+    #         name = self.testA_image_names[i].strip('.png') + '_synthetic.png'
+    #         synt_B = synthetic_images_B[i]
+    #         save_image(synt_B, name, 'B')
 
-        print('{} synthetic images have been generated and placed in ./generate_images/synthetic_images'
-              .format(len(self.A_test) + len(self.B_test)))
+   ##       print('{} synthetic images have been generated and placed in ./generate_images/synthetic_images'
+    #           .format(len(self.A_test) + len(self.B_test)))
 
 
 # reflection padding taken from
