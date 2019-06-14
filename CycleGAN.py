@@ -31,7 +31,7 @@ os.environ["CUDA_VISIBLE_DEVICES"]="1"
 # np.random.seed(seed=12345)
 
 class CycleGAN():
-    def __init__(self, image_folder='T1T2'):
+    def __init__(self, image_folder='retina'):
 
         # ======= Data ==========
         print('--- Caching data ---')
@@ -39,7 +39,14 @@ class CycleGAN():
         data = load_data(subfolder=image_folder)
 
         self.channels = data["nr_of_channels"]
-        self.img_shape = data["image_size"] + (self.channels,)
+        self.img_shape = data["image_size_A"] + (self.channels,)
+        
+        self.channels_A = data["nr_of_channels_A"]
+        self.img_shape_A = data["image_size_A"] + (self.channels_A,)
+        
+        self.channels_B = data["nr_of_channels_B"]
+        self.img_shape_B = data["image_size_B"] + (self.channels_B,)
+
         print('Image shape: ', self.img_shape)
 
         self.A_train = data["trainA_images"]
@@ -63,7 +70,7 @@ class CycleGAN():
         self.synthetic_pool_size = 50  # Size of image pools used for training the discriminators
         self.beta_1 = 0.5  # Adam parameter
         self.beta_2 = 0.999  # Adam parameter
-        self.batch_size = 4  # Number of images per batch
+        self.batch_size = 5  # Number of images per batch
         self.epochs = 200  # choose multiples of 20 since the models are saved each 20th epoch
 
         self.save_models = False  # Save or not the generator and discriminator models
