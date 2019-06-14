@@ -28,16 +28,21 @@ os.environ["CUDA_VISIBLE_DEVICES"]="1"
 # np.random.seed(seed=12345)
 
 class CycleGAN():
-    def __init__(self, image_folder='retinaBW2'):
+    def __init__(self, image_folder='retina2'):
 
         # ======= Data ==========
         print('--- Caching data ---')
 
         data = load_data(subfolder=image_folder)
 
-        self.channels = data["nr_of_channels"]
-        self.img_shape = data["image_size"] + (self.channels,)
-        print('Image shape: ', self.img_shape)
+        self.channels_A = data["nr_of_channels_A"]
+        self.img_shape_A = data["image_size_A"] + (self.channels_A,)
+        
+        self.channels_B = data["nr_of_channels_B"]
+        self.img_shape_B = data["image_size_B"] + (self.channels_B,)
+
+        print('Image A shape: ', self.img_shape_A)
+        print('Image B shape: ', self.img_shape_B)
 
         self.A_train = data["trainA_images"]
         self.B_train = data["trainB_images"]
@@ -92,10 +97,10 @@ class CycleGAN():
         self.opt_G = Adam(self.learning_rate_G, self.beta_1, self.beta_2)
 
         # Build discriminators
-        D_B = self.build_discriminator()
+        D_B = self.build_discriminator(self.img_shape_B)
 
         # Define discriminator models
-        image_B = Input(shape=self.img_shape)
+        image_B = Input(shape=self.img_shape_B)
         guess_B = D_B(image_B)
         self.D_B = Model(inputs=image_B, outputs=guess_B, name='D_B_model')
 
@@ -112,10 +117,10 @@ class CycleGAN():
         self.D_B_static.trainable = False
 
         # Build generators
-        self.G_A2B = self.build_generator(name='G_A2B_model')
+        self.G_A2B = self.build_generator(self.img_shape_A, self.img_shape_B, name='G_A2B_model')
 
         # Define full CycleGAN model, used for training the generators
-        real_A = Input(shape=self.img_shape, name='real_A')
+        real_A = Input(shape=self.img_shape_A, name='real_A')
         synthetic_B = self.G_A2B(real_A)
         dB_guess_synthetic = self.D_B_static(synthetic_B)
 
@@ -222,9 +227,9 @@ class CycleGAN():
 #===============================================================================
 # Models
 
-    def build_discriminator(self, name=None):
+    def build_discriminator(self, img_shape, name=None):
         # Input
-        input_img = Input(shape=self.img_shape)
+        input_img = Input(shape=img_shape)
 
         # Layers 1-4
         x = self.ck(input_img, 64, False, True) #  Instance normalization is not used for this layer)
@@ -244,9 +249,9 @@ class CycleGAN():
 
         return Model(inputs=input_img, outputs=x, name=name)
 
-    def build_generator(self, name=None):
+    def build_generator(self, img_shape_in, img_shape_out, name=None):
         # Layer 1: Input
-        input_img = Input(shape=self.img_shape)
+        input_img = Input(shape=img_shape_in)
         x = ReflectionPadding2D((3, 3))(input_img)
         x = self.c7Ak(x, 32)
 
@@ -264,7 +269,7 @@ class CycleGAN():
 
         # Layer 15: Output
         x = ReflectionPadding2D((3, 3))(x)
-        x = Conv2D(self.channels, kernel_size=7, strides=1, padding='valid', use_bias=True)(x)
+        x = Conv2D(filters=img_shape_out[-1], kernel_size=7, strides=1, padding='valid', use_bias=True)(x)
         x = Activation('tanh')(x)
 
         return Model(inputs=input_img, outputs=x, name=name)
@@ -423,11 +428,12 @@ class CycleGAN():
         image = np.hstack(images)
 
         # Save images
-        if self.channels == 1:
+        if image.shape[2] == 1:
             image = image[:, :, 0]
-
-        # toimage(image, cmin=-1, cmax=1).save(save_path)
-        mpimage.imsave(save_path, image, vmin=-1, vmax=1, cmap='gray')
+            mpimage.imsave(save_path, image, vmin=-1, vmax=1, cmap='gray')
+        else:
+            image = (image+1) / 2
+            mpimage.imsave(save_path, image)
 
     def save_epoch_images(self, epoch, num_saved_images=1):
         # Save training images
@@ -439,6 +445,13 @@ class CycleGAN():
         real_image_B = self.B_train[rand_ind]
         synthetic_image_B = self.G_A2B.predict(real_image_A[np.newaxis])[0]
 
+        # Add dimensions if A and B have different number of channels
+        if self.channels_A == 1 and self.channels_B == 3:
+            real_image_A = np.tile(real_image_A, [1,1,3])
+        elif self.channels_B == 1 and self.channels_A == 3:
+            synthetic_image_B = np.tile(synthetic_image_B, [1,1,3])
+            real_image_B = np.tile(real_image_B, [1,1,3])
+
         save_path = '{}/train_A/epoch{}.png'.format(self.out_dir, epoch)
 
         self.join_and_save((real_image_A, synthetic_image_B, real_image_B), save_path)
@@ -448,6 +461,13 @@ class CycleGAN():
         real_image_B = self.B_test[0]
         synthetic_image_B = self.G_A2B.predict(real_image_A[np.newaxis])[0]
 
+        # Add dimensions if A and B have different number of channels
+        if self.channels_A == 1 and self.channels_B == 3:
+            real_image_A = np.tile(real_image_A, [1,1,3])
+        elif self.channels_B == 1 and self.channels_A == 3:
+            synthetic_image_B = np.tile(synthetic_image_B, [1,1,3])
+            real_image_B = np.tile(real_image_B, [1,1,3])
+
         save_path = '{}/test_A/epoch{}.png'.format(self.out_dir, epoch)
 
         self.join_and_save((real_image_A, synthetic_image_B, real_image_B), save_path)
@@ -455,6 +475,13 @@ class CycleGAN():
 
     def save_tmp_images(self, real_image_A, synthetic_image_B, real_image_B ):
         try:
+            # Add dimensions if A and B have different number of channels
+            if self.channels_A == 1 and self.channels_B == 3:
+                real_image_A = np.tile(real_image_A, [1,1,3])
+            elif self.channels_B == 1 and self.channels_A == 3:
+                synthetic_image_B = np.tile(synthetic_image_B, [1,1,3])
+                real_image_B = np.tile(real_image_B, [1,1,3])
+                
             save_path = '{}/tmp.png'.format(self.out_dir)
             self.join_and_save((real_image_A, synthetic_image_B, real_image_B), save_path)
         except: # Ignore if file is open
@@ -525,7 +552,8 @@ class CycleGAN():
         data = {}
         data['meta_data'] = []
         data['meta_data'].append({
-            'img shape: height,width,channels': self.img_shape,
+            'img shape_A: height,width,channels': self.img_shape_A,
+            'img shape_B: height,width,channels': self.img_shape_B,
             'batch size': self.batch_size,
             'save training img interval': self.save_training_img_interval,
             'normalization function': str(self.normalization),
@@ -553,41 +581,41 @@ class CycleGAN():
         with open('{}/meta_data.json'.format(self.out_dir), 'w') as outfile:
             json.dump(data, outfile, sort_keys=True)
 
-    def load_model_and_weights(self, model):
-        path_to_model = os.path.join('generate_images', 'models', '{}.json'.format(model.name))
-        path_to_weights = os.path.join('generate_images', 'models', '{}.hdf5'.format(model.name))
-        #model = model_from_json(path_to_model)
-        model.load_weights(path_to_weights)
+    # def load_model_and_weights(self, model):
+    #     path_to_model = os.path.join('generate_images', 'models', '{}.json'.format(model.name))
+    #     path_to_weights = os.path.join('generate_images', 'models', '{}.hdf5'.format(model.name))
+    #     #model = model_from_json(path_to_model)
+    #     model.load_weights(path_to_weights)
 
-    def load_model_and_generate_synthetic_images(self):
-        self.load_model_and_weights(self.G_A2B)
-        self.load_model_and_weights(self.G_B2A)
-        synthetic_images_B = self.G_A2B.predict(self.A_test)
-        synthetic_images_A = self.G_B2A.predict(self.B_test)
+   ##   def load_model_and_generate_synthetic_images(self):
+    #     self.load_model_and_weights(self.G_A2B)
+    #     self.load_model_and_weights(self.G_B2A)
+    #     synthetic_images_B = self.G_A2B.predict(self.A_test)
+    #     synthetic_images_A = self.G_B2A.predict(self.B_test)
 
-        def save_image(image, name, domain):
-            if self.channels == 1:
-                image = image[:, :, 0]
-            # image = image.clip(min=0)
-            toimage(image, cmin=-1, cmax=1).save(os.path.join(
-                'generate_images', 'synthetic_images', domain, name))
+   ##       def save_image(image, name, domain):
+    #         if self.channels == 1:
+    #             image = image[:, :, 0]
+    #         # image = image.clip(min=0)
+    #         toimage(image, cmin=-1, cmax=1).save(os.path.join(
+    #             'generate_images', 'synthetic_images', domain, name))
 
-        # Test A images
-        for i in range(len(synthetic_images_A)):
-            # Get the name from the image it was conditioned on
-            name = self.testB_image_names[i].strip('.png') + '_synthetic.png'
-            synt_A = synthetic_images_A[i]
-            save_image(synt_A, name, 'A')
+   ##       # Test A images
+    #     for i in range(len(synthetic_images_A)):
+    #         # Get the name from the image it was conditioned on
+    #         name = self.testB_image_names[i].strip('.png') + '_synthetic.png'
+    #         synt_A = synthetic_images_A[i]
+    #         save_image(synt_A, name, 'A')
 
-        # Test B images
-        for i in range(len(synthetic_images_B)):
-            # Get the name from the image it was conditioned on
-            name = self.testA_image_names[i].strip('.png') + '_synthetic.png'
-            synt_B = synthetic_images_B[i]
-            save_image(synt_B, name, 'B')
+   ##       # Test B images
+    #     for i in range(len(synthetic_images_B)):
+    #         # Get the name from the image it was conditioned on
+    #         name = self.testA_image_names[i].strip('.png') + '_synthetic.png'
+    #         synt_B = synthetic_images_B[i]
+    #         save_image(synt_B, name, 'B')
 
-        print('{} synthetic images have been generated and placed in ./generate_images/synthetic_images'
-              .format(len(self.A_test) + len(self.B_test)))
+   ##       print('{} synthetic images have been generated and placed in ./generate_images/synthetic_images'
+    #           .format(len(self.A_test) + len(self.B_test)))
 
 
 # reflection padding taken from
