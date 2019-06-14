@@ -20,23 +20,30 @@ def load_data(subfolder='', generator=False):
     testB_image_names = sorted(os.listdir(testB_path))
 
     # Examine one image to get size and number of channels
-    im_test = mpimage.imread(os.path.join(trainA_path, trainA_image_names[0]))
-    # im_test = np.array(Image.open(os.path.join(trainA_path, trainA_image_names[0])))
-    
+    im_test_A = mpimage.imread(os.path.join(trainA_path, trainA_image_names[0]))
+    im_test_B = mpimage.imread(os.path.join(trainB_path, trainB_image_names[0]))    
 
-    if len(im_test.shape) == 2:
-        image_size = im_test.shape
-        nr_of_channels = 1
+    if len(im_test_A.shape) == 2:
+        image_size_A = im_test_A.shape
+        nr_of_channels_A = 1
     else:
-        image_size = im_test.shape[0:-1]
-        nr_of_channels = im_test.shape[-1]
+        image_size_A = im_test_A.shape[0:-1]
+        nr_of_channels_A = im_test_A.shape[-1]
+        
+    if len(im_test_B.shape) == 2:
+        image_size_B = im_test_B.shape
+        nr_of_channels_B = 1
+    else:
+        image_size_B = im_test_B.shape[0:-1]
+        nr_of_channels_B = im_test_B.shape[-1]
 
-    trainA_images = create_image_array(trainA_image_names, trainA_path, image_size, nr_of_channels)
-    trainB_images = create_image_array(trainB_image_names, trainB_path, image_size, nr_of_channels)
-    testA_images = create_image_array(testA_image_names, testA_path, image_size, nr_of_channels)
-    testB_images = create_image_array(testB_image_names, testB_path, image_size, nr_of_channels)
+    trainA_images = create_image_array(trainA_image_names, trainA_path, image_size_A, nr_of_channels_A)
+    trainB_images = create_image_array(trainB_image_names, trainB_path, image_size_B, nr_of_channels_B)
+    testA_images = create_image_array(testA_image_names, testA_path, image_size_B, nr_of_channels_A)
+    testB_images = create_image_array(testB_image_names, testB_path, image_size_B, nr_of_channels_B)
     
-    return {"image_size": image_size, "nr_of_channels": nr_of_channels,
+    return {"image_size_A": image_size_A, "nr_of_channels_A": nr_of_channels_A,
+            "image_size_B": image_size_B, "nr_of_channels_B": nr_of_channels_B,
             "trainA_images": trainA_images, "trainB_images": trainB_images,
             "testA_images": testA_images, "testB_images": testB_images,
             "trainA_image_names": trainA_image_names,
