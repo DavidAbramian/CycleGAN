@@ -28,7 +28,7 @@ os.environ["CUDA_VISIBLE_DEVICES"]="1"
 # np.random.seed(seed=12345)
 
 class CycleGAN():
-    def __init__(self, image_folder='retina2'):
+    def __init__(self, image_folder):
 
         # ======= Data ==========
         print('--- Caching data ---')
@@ -37,7 +37,7 @@ class CycleGAN():
 
         self.channels_A = data["nr_of_channels_A"]
         self.img_shape_A = data["image_size_A"] + (self.channels_A,)
-        
+
         self.channels_B = data["nr_of_channels_B"]
         self.img_shape_B = data["image_size_B"] + (self.channels_B,)
 
@@ -481,7 +481,7 @@ class CycleGAN():
             elif self.channels_B == 1 and self.channels_A == 3:
                 synthetic_image_B = np.tile(synthetic_image_B, [1,1,3])
                 real_image_B = np.tile(real_image_B, [1,1,3])
-                
+
             save_path = '{}/tmp.png'.format(self.out_dir)
             self.join_and_save((real_image_A, synthetic_image_B, real_image_B), save_path)
         except: # Ignore if file is open
@@ -682,4 +682,8 @@ class ImagePool():
 
 
 if __name__ == '__main__':
-    GAN = CycleGAN()
+    args = sys.argv[1:]
+    if len(args) != 1:
+        sys.exit(' Usage: python CycleGAN_supervised.py dataset')
+    
+    CycleGAN(sys.argv[1])

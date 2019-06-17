@@ -28,16 +28,16 @@ os.environ["CUDA_VISIBLE_DEVICES"]="1"
 # np.random.seed(seed=12345)
 
 class CycleGAN():
-    def __init__(self, image_folder='retina2'):
+    def __init__(self, image_folder):
 
         # ======= Data ==========
         print('--- Caching data ---')
 
         data = load_data(subfolder=image_folder)
-        
+
         self.channels_A = data["nr_of_channels_A"]
         self.img_shape_A = data["image_size_A"] + (self.channels_A,)
-        
+
         self.channels_B = data["nr_of_channels_B"]
         self.img_shape_B = data["image_size_B"] + (self.channels_B,)
 
@@ -508,7 +508,7 @@ class CycleGAN():
         synthetic_image_A = self.G_B2A.predict(real_image_B[np.newaxis])[0]
         reconstructed_image_A = self.G_B2A.predict(synthetic_image_B[np.newaxis])[0]
         reconstructed_image_B = self.G_A2B.predict(synthetic_image_A[np.newaxis])[0]
-        
+
         # Add dimensions if A and B have different number of channels
         if self.channels_A == 1 and self.channels_B == 3:
             real_image_A = np.tile(real_image_A, [1,1,3])
@@ -524,13 +524,13 @@ class CycleGAN():
         if self.paired_data:
             real_image_Ab = self.B_train[rand_ind_A]
             real_image_Ba = self.A_train[rand_ind_B]
-            
+
             # Add dimensions if A and B have different number of channels
             if self.channels_A == 1 and self.channels_B == 3:
                 real_image_Ba = np.tile(real_image_Ba, [1,1,3])
             elif self.channels_B == 1 and self.channels_A == 3:
                 real_image_Ab = np.tile(real_image_Ab, [1,1,3])
-            
+
             self.join_and_save((real_image_Ab, real_image_A, synthetic_image_B, reconstructed_image_A), save_path_A)
             self.join_and_save((real_image_Ba, real_image_B, synthetic_image_A, reconstructed_image_B), save_path_B)
         else:
@@ -560,13 +560,13 @@ class CycleGAN():
         if self.paired_data:
             real_image_Ab = self.B_test[0]
             real_image_Ba = self.A_test[0]
-            
+
             # Add dimensions if A and B have different number of channels
             if self.channels_A == 1 and self.channels_B == 3:
                 real_image_Ba = np.tile(real_image_Ba, [1,1,3])
             elif self.channels_B == 1 and self.channels_A == 3:
                 real_image_Ab = np.tile(real_image_Ab, [1,1,3])
-            
+
             self.join_and_save((real_image_Ab, real_image_A, synthetic_image_B, reconstructed_image_A), save_path_A)
             self.join_and_save((real_image_Ba, real_image_B, synthetic_image_A, reconstructed_image_B), save_path_B)
         else:
@@ -587,7 +587,7 @@ class CycleGAN():
                 real_image_B = np.tile(real_image_B, [1,1,3])
                 synthetic_image_B = np.tile(synthetic_image_B, [1,1,3])
                 reconstructed_image_B = np.tile(reconstructed_image_B, [1,1,3])
-            
+
             real_images = np.vstack((real_image_A, real_image_B))
             synthetic_images = np.vstack((synthetic_image_B, synthetic_image_A))
             reconstructed_images = np.vstack((reconstructed_image_A, reconstructed_image_B))
@@ -795,4 +795,8 @@ class ImagePool():
 
 
 if __name__ == '__main__':
-    GAN = CycleGAN()
+    args = sys.argv[1:]
+    if len(args) != 1:
+        sys.exit(' Usage: python CycleGAN.py dataset')
+    
+    CycleGAN(sys.argv[1])

@@ -1,4 +1,5 @@
 import os
+import sys
 import numpy as np
 
 # from PIL import Image
@@ -7,11 +8,15 @@ from progress.bar import Bar
 
 def load_data(subfolder='', generator=False):
 
+    dataset_path = os.path.join('data', subfolder)
+    if not os.path.isdir(dataset_path):
+        sys.exit(' Dataset ' + subfolder + ' does not exist')
+
     # Image paths
-    trainA_path = os.path.join('data', subfolder, 'trainA')
-    trainB_path = os.path.join('data', subfolder, 'trainB')
-    testA_path = os.path.join('data', subfolder, 'testA')
-    testB_path = os.path.join('data', subfolder, 'testB')
+    trainA_path = os.path.join(dataset_path, 'trainA')
+    trainB_path = os.path.join(dataset_path, 'trainB')
+    testA_path = os.path.join(dataset_path, 'testA')
+    testB_path = os.path.join(dataset_path, 'testB')
 
     # Image file names
     trainA_image_names = sorted(os.listdir(trainA_path))
