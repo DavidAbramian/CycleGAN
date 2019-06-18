@@ -48,8 +48,6 @@ class CycleGAN():
         self.B_train = data["trainB_images"]
         self.A_test = data["testA_images"]
         self.B_test = data["testB_images"]
-        self.testA_image_names = data["testA_image_names"]
-        self.testB_image_names = data["testB_image_names"]
 
         self.paired_data = True
 
@@ -693,43 +691,6 @@ class CycleGAN():
 
         with open('{}/meta_data.json'.format(self.out_dir), 'w') as outfile:
             json.dump(data, outfile, sort_keys=True)
-
-    # def load_model_and_weights(self, model):
-    #     path_to_model = os.path.join('generate_images', 'models', '{}.json'.format(model.name))
-    #     path_to_weights = os.path.join('generate_images', 'models', '{}.hdf5'.format(model.name))
-    #     #model = model_from_json(path_to_model)
-    #     model.load_weights(path_to_weights)
-
-   ##   def load_model_and_generate_synthetic_images(self):
-    #     self.load_model_and_weights(self.G_A2B)
-    #     self.load_model_and_weights(self.G_B2A)
-    #     synthetic_images_B = self.G_A2B.predict(self.A_test)
-    #     synthetic_images_A = self.G_B2A.predict(self.B_test)
-
-   ##       def save_image(image, name, domain):
-    #         if self.channels == 1:
-    #             image = image[:, :, 0]
-    #         # image = image.clip(min=0)
-    #         toimage(image, cmin=-1, cmax=1).save(os.path.join(
-    #             'generate_images', 'synthetic_images', domain, name))
-
-   ##       # Test A images
-    #     for i in range(len(synthetic_images_A)):
-    #         # Get the name from the image it was conditioned on
-    #         name = self.testB_image_names[i].strip('.png') + '_synthetic.png'
-    #         synt_A = synthetic_images_A[i]
-    #         save_image(synt_A, name, 'A')
-
-   ##       # Test B images
-    #     for i in range(len(synthetic_images_B)):
-    #         # Get the name from the image it was conditioned on
-    #         name = self.testA_image_names[i].strip('.png') + '_synthetic.png'
-    #         synt_B = synthetic_images_B[i]
-    #         save_image(synt_B, name, 'B')
-
-   ##       print('{} synthetic images have been generated and placed in ./generate_images/synthetic_images'
-    #           .format(len(self.A_test) + len(self.B_test)))
-
 
 # reflection padding taken from
 # https://github.com/fastai/courses/blob/master/deeplearning2/neural-style.ipynb

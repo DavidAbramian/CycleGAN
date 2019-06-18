@@ -50,11 +50,8 @@ def load_data(subfolder='', generator=False):
     return {"image_size_A": image_size_A, "nr_of_channels_A": nr_of_channels_A,
             "image_size_B": image_size_B, "nr_of_channels_B": nr_of_channels_B,
             "trainA_images": trainA_images, "trainB_images": trainB_images,
-            "testA_images": testA_images, "testB_images": testB_images,
-            "trainA_image_names": trainA_image_names,
-            "trainB_image_names": trainB_image_names,
-            "testA_image_names": testA_image_names,
-            "testB_image_names": testB_image_names}
+            "testA_images": testA_images, "testB_images": testB_images}
+
 
 def create_image_array(image_list, image_path, image_size, nr_of_channels):
     bar = Bar('Loading...', max=len(image_list))
