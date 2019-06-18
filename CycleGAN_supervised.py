@@ -525,17 +525,17 @@ class CycleGAN():
 
     def save_model(self, model, epoch):
         # Create folder to save model architecture and weights
-        directory = os.path.join('saved_models', self.date_time)
-        if not os.path.exists(directory):
-            os.makedirs(directory)
+        model_out_dir = os.path.join('saved_models', self.date_time)
+        if not os.path.exists(model_out_dir):
+            os.makedirs(model_out_dir)
 
-        weights_path = '{}/{}_weights_epoch_{}.hdf5'.format(directory, model.name, epoch)
+        weights_path = '{}/{}_weights_epoch_{}.hdf5'.format(model_out_dir, model.name, epoch)
         model.save_weights(weights_path)
-        model_path = '{}/{}_model_epoch_{}.json'.format(directory, model.name, epoch)
-        model.save_weights(model_path)
-        json_string = model.to_json()
+        
+        model_path = '{}/{}_model_epoch_{}.json'.format(model_out_dir, model.name, epoch)
+        model_json_string = model.to_json()
         with open(model_path, 'w') as outfile:
-            json.dump(json_string, outfile)
+            outfile.write(model_json_string)
         print('{} has been saved in saved_models/{}/'.format(model.name, self.date_time))
 
     def write_loss_data_to_file(self, history):
