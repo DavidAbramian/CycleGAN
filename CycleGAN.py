@@ -641,10 +641,10 @@ class CycleGAN():
         if not os.path.exists(model_out_dir):
             os.makedirs(model_out_dir)
 
-        weights_path = '{}/{}_weights_epoch_{}.hdf5'.format(model_out_dir, model.name, epoch)
+        weights_path = '{}/{}_epoch_{}.hdf5'.format(model_out_dir, model.name, epoch)
         model.save_weights(weights_path)
         
-        model_path = '{}/{}_model_epoch_{}.json'.format(model_out_dir, model.name, epoch)
+        model_path = '{}/{}_epoch_{}.json'.format(model_out_dir, model.name, epoch)
         model_json_string = model.to_json()
         with open(model_path, 'w') as outfile:
             outfile.write(model_json_string)
