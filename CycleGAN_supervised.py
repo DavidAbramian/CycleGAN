@@ -594,6 +594,11 @@ class ReflectionPadding2D(Layer):
         w_pad, h_pad = self.padding
         return tf.pad(x, [[0, 0], [h_pad, h_pad], [w_pad, w_pad], [0, 0]], 'REFLECT')
 
+    def get_config(self):
+        config = {'padding': self.padding}
+        base_config = super(ReflectionPadding2D, self).get_config()
+        return dict(list(base_config.items()) + list(config.items()))
+
 
 class ImagePool():
     def __init__(self, pool_size):
