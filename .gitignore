@@ -1,5 +1,9 @@
 /data
 /images
+/generated_images
 /notebook_images
 /saved_models
 /__pycache__
+
+*.sh
+*.m
