@@ -66,7 +66,7 @@ class CycleGAN():
         self.batch_size = 3  # Number of images per batch
         self.epochs = 200  # choose multiples of 20 since the models are saved each 20th epoch
 
-        self.save_models = False  # Save or not the generator and discriminator models
+        self.save_models = True  # Save or not the generator and discriminator models
         self.save_training_img = True  # Save or not example training results or only tmp.png
         self.save_training_img_interval = 1  # Number of epoch between saves of intermediate training results
         self.tmp_img_update_frequency = 3  # Number of batches between updates of tmp.png
