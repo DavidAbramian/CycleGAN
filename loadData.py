@@ -1,3 +1,4 @@
+import glob
 import os
 import sys
 import numpy as np
@@ -19,10 +20,15 @@ def load_data(subfolder='', generator=False):
     testB_path = os.path.join(dataset_path, 'testB')
 
     # Image file names
-    trainA_image_names = sorted(os.listdir(trainA_path))
-    trainB_image_names = sorted(os.listdir(trainB_path))
-    testA_image_names = sorted(os.listdir(testA_path))
-    testB_image_names = sorted(os.listdir(testB_path))
+    trainA_image_names = sorted(glob.glob(os.path.join(trainA_path,'*.png')))
+    trainB_image_names = sorted(glob.glob(os.path.join(trainB_path,'*.png')))
+    testA_image_names = sorted(glob.glob(os.path.join(testA_path,'*.png')))
+    testB_image_names = sorted(glob.glob(os.path.join(testB_path,'*.png')))
+
+    trainA_image_names = [os.path.basename(x) for x in trainA_image_names]
+    trainB_image_names = [os.path.basename(x) for x in trainB_image_names]
+    testA_image_names = [os.path.basename(x) for x in testA_image_names]
+    testB_image_names = [os.path.basename(x) for x in testB_image_names]
 
     # Examine one image to get size and number of channels
     im_test_A = mpimage.imread(os.path.join(trainA_path, trainA_image_names[0]))
@@ -63,12 +69,16 @@ def load_test_data(subfolder='', generator=False):
     testB_path = os.path.join(dataset_path, 'testB')
 
     # Image file names
-    testA_image_names = sorted(os.listdir(testA_path))
-    testB_image_names = sorted(os.listdir(testB_path))
+    testA_image_names = sorted(glob.glob(os.path.join(testA_path,'*.png')))
+    testB_image_names = sorted(glob.glob(os.path.join(testB_path,'*.png')))
+
+    testA_image_names = [os.path.basename(x) for x in testA_image_names]
+    testB_image_names = [os.path.basename(x) for x in testB_image_names]
 
     # Examine one image to get size and number of channels
     im_test_A = mpimage.imread(os.path.join(testA_path, testA_image_names[0]))
     im_test_B = mpimage.imread(os.path.join(testB_path, testB_image_names[0]))    
+    
 
     if len(im_test_A.shape) == 2:
         image_size_A = im_test_A.shape
