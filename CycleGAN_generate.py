@@ -24,14 +24,16 @@ import tensorflow as tf
 from loadData import load_test_data
 
 os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
-os.environ["CUDA_VISIBLE_DEVICES"]="1"
 
 # np.random.seed(seed=12345)
 
 class CycleGAN():
     def __init__(self, model_subfolder):
 
-        self.model_subfolder = os.path.split(model_subfolder)[-1]
+        # Parse input arguments
+        os.environ["CUDA_VISIBLE_DEVICES"]=str(args.gpu)  # Select GPU device
+        self.model_subfolder = os.path.split(args.model)[-1]
+
         self.model_path = os.path.join('saved_models', self.model_subfolder)
         if not os.path.isdir(self.model_path):
             sys.exit(' Model ' + self.model_subfolder + ' does not exist')
@@ -166,8 +168,10 @@ class ReflectionPadding2D(Layer):
 
 
 if __name__ == '__main__':
-    args = sys.argv[1:]
-    if len(args) != 1:
-        sys.exit(' Usage: python CycleGAN_generate.py model_subfolder')
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('model', help='name of the model on which to run CycleGAN (stored in saved_models/)')
+    parser.add_argument('-g', '--gpu', type=int, default=0, help='ID of GPU on which to run')
+    args = parser.parse_args()
     
-    CycleGAN(sys.argv[1])
+    CycleGAN(args)

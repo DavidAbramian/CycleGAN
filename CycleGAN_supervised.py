@@ -23,12 +23,16 @@ import tensorflow as tf
 from loadData import load_data
 
 os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
-os.environ["CUDA_VISIBLE_DEVICES"]="1"
 
 # np.random.seed(seed=12345)
 
 class CycleGAN():
-    def __init__(self, image_folder):
+    def __init__(self, args):
+
+        # Parse input arguments
+        os.environ["CUDA_VISIBLE_DEVICES"]=str(args.gpu)  # Select GPU device
+        image_folder = os.path.split(args.dataset)[-1]
+        batch_size = args.batch
 
         # ======= Data ==========
         print('--- Caching data ---')
@@ -60,7 +64,7 @@ class CycleGAN():
         self.synthetic_pool_size = 50  # Size of image pools used for training the discriminators
         self.beta_1 = 0.5  # Adam parameter
         self.beta_2 = 0.999  # Adam parameter
-        self.batch_size = 5  # Number of images per batch
+        self.batch_size = batch_size  # Number of images per batch
         self.epochs = 200  # choose multiples of 20 since the models are saved each 20th epoch
         # self.epochs = 1000  # choose multiples of 20 since the models are saved each 20th epoch
 
@@ -648,8 +652,11 @@ class ImagePool():
 
 
 if __name__ == '__main__':
-    args = sys.argv[1:]
-    if len(args) != 1:
-        sys.exit(' Usage: python CycleGAN_supervised.py dataset')
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('dataset', help='name of the dataset on which to run CycleGAN (stored in data/)')
+    parser.add_argument('-g', '--gpu', type=int, default=0, help='ID of GPU on which to run')
+    parser.add_argument('-b', '--batch', type=int, default=5, help='batch size to use during training')
+    args = parser.parse_args()
     
-    CycleGAN(sys.argv[1])
+    CycleGAN(args)
