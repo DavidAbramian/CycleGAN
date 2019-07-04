@@ -610,9 +610,9 @@ class CycleGAN():
 
             # Add dimensions if A and B have different number of channels
             if self.channels_A == 1 and self.channels_B == 3:
-                real_volume_Ba = np.tile(real_volume_Ba, [1,1,3])
+                real_volume_Ba = np.tile(real_volume_Ba, [1,1,1,3])
             elif self.channels_B == 1 and self.channels_A == 3:
-                real_volume_Ab = np.tile(real_volume_Ab, [1,1,3])
+                real_volume_Ab = np.tile(real_volume_Ab, [1,1,1,3])
 
             img = nib.Nifti1Image(real_volume_A, np.eye(4))
             nib.save(img,save_path_realA)
