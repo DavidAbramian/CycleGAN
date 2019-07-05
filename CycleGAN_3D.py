@@ -18,6 +18,10 @@ import sys
 import os
 
 import keras.backend as K
+dtype='float16'
+K.set_floatx(dtype)
+K.set_epsilon(1e-5)
+
 import tensorflow as tf
 
 from loadData_3D import load_data_3D
@@ -70,7 +74,7 @@ class CycleGAN():
         self.beta_1 = 0.5  # Adam parameter
         self.beta_2 = 0.999  # Adam parameter
         self.batch_size = batch_size  # Number of volumes per batch
-        self.epochs = 5  # choose multiples of 20 since the models are saved each 20th epoch
+        self.epochs = 200  # choose multiples of 20 since the models are saved each 20th epoch
 
         self.save_models = True  # Save or not the generator and discriminator models
         self.save_training_vol = True  # Save or not example training results or only tmp.png
@@ -551,22 +555,22 @@ class CycleGAN():
             #elif self.channels_B == 1 and self.channels_A == 3:
             #    real_volume_Ab = np.tile(real_volume_Ab, [1,1,1,3])
 
-            img = nib.Nifti1Image(real_volume_A, np.eye(4))
+            img = nib.Nifti1Image(real_volume_A.astype("float32"), np.eye(4))
             nib.save(img,save_path_realA)
 
-            img = nib.Nifti1Image(real_volume_B, np.eye(4))
+            img = nib.Nifti1Image(real_volume_B.astype("float32"), np.eye(4))
             nib.save(img,save_path_realB)
 
-            img = nib.Nifti1Image(synthetic_volume_A, np.eye(4))
+            img = nib.Nifti1Image(synthetic_volume_A.astype("float32"), np.eye(4))
             nib.save(img,save_path_syntheticA)
 
-            img = nib.Nifti1Image(synthetic_volume_B, np.eye(4))
+            img = nib.Nifti1Image(synthetic_volume_B.astype("float32"), np.eye(4))
             nib.save(img,save_path_syntheticB)
 
-            img = nib.Nifti1Image(reconstructed_volume_A, np.eye(4))
+            img = nib.Nifti1Image(reconstructed_volume_A.astype("float32"), np.eye(4))
             nib.save(img,save_path_reconstructedA)
 
-            img = nib.Nifti1Image(reconstructed_volume_B, np.eye(4))
+            img = nib.Nifti1Image(reconstructed_volume_B.astype("float32"), np.eye(4))
             nib.save(img,save_path_reconstructedB)
 
             #self.join_and_save((real_volume_Ab, real_volume_A, synthetic_volume_B, reconstructed_volume_A), save_path_A)
@@ -578,8 +582,15 @@ class CycleGAN():
         #---
 
         # Save test volumes
-        real_volume_A = self.A_test[0]
-        real_volume_B = self.B_test[0]
+        nr_test_vol_A = self.A_test.shape[0]
+        nr_test_vol_B = self.B_test.shape[0]
+
+        rand_ind_A = np.random.randint(nr_test_vol_A)
+        rand_ind_B = np.random.randint(nr_test_vol_B)
+
+        real_volume_A = self.A_test[rand_ind_A]
+        real_volume_B = self.B_test[rand_ind_B]
+
         synthetic_volume_B = self.G_A2B.predict(real_volume_A[np.newaxis])[0]
         synthetic_volume_A = self.G_B2A.predict(real_volume_B[np.newaxis])[0]
         reconstructed_volume_A = self.G_B2A.predict(synthetic_volume_B[np.newaxis])[0]
@@ -605,8 +616,8 @@ class CycleGAN():
         save_path_reconstructedB = '{}/test_B/epoch{}_reconstructedB.nii.gz'.format(self.out_dir, epoch)
 
         if self.paired_data:
-            real_volume_Ab = self.B_test[0]
-            real_volume_Ba = self.A_test[0]
+            real_volume_Ab = self.B_test[rand_ind_A] 
+            real_volume_Ba = self.A_test[rand_ind_B]
 
             # Add dimensions if A and B have different number of channels
             if self.channels_A == 1 and self.channels_B == 3:
@@ -614,22 +625,22 @@ class CycleGAN():
             elif self.channels_B == 1 and self.channels_A == 3:
                 real_volume_Ab = np.tile(real_volume_Ab, [1,1,1,3])
 
-            img = nib.Nifti1Image(real_volume_A, np.eye(4))
+            img = nib.Nifti1Image(real_volume_A.astype("float32"), np.eye(4))
             nib.save(img,save_path_realA)
 
-            img = nib.Nifti1Image(real_volume_B, np.eye(4))
+            img = nib.Nifti1Image(real_volume_B.astype("float32"), np.eye(4))
             nib.save(img,save_path_realB)
 
-            img = nib.Nifti1Image(synthetic_volume_A, np.eye(4))
+            img = nib.Nifti1Image(synthetic_volume_A.astype("float32"), np.eye(4))
             nib.save(img,save_path_syntheticA)
 
-            img = nib.Nifti1Image(synthetic_volume_B, np.eye(4))
+            img = nib.Nifti1Image(synthetic_volume_B.astype("float32"), np.eye(4))
             nib.save(img,save_path_syntheticB)
 
-            img = nib.Nifti1Image(reconstructed_volume_A, np.eye(4))
+            img = nib.Nifti1Image(reconstructed_volume_A.astype("float32"), np.eye(4))
             nib.save(img,save_path_reconstructedA)
 
-            img = nib.Nifti1Image(reconstructed_volume_B, np.eye(4))
+            img = nib.Nifti1Image(reconstructed_volume_B.astype("float32"), np.eye(4))
             nib.save(img,save_path_reconstructedB)
 
             #self.join_and_save((real_volume_Ab, real_volume_A, synthetic_volume_B, reconstructed_volume_A), save_path_A)
