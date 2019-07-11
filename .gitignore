@@ -1,6 +1,7 @@
 /data
 /images
 /generated_images
+/synthetic_volumes
 /notebook_images
 /saved_models
 /__pycache__
