@@ -170,8 +170,8 @@ class CycleGAN():
 # Architecture functions
 
     # Discriminator layers
-    def ck(self, x, k, use_normalization, use_bias):
-        x = Conv2D(filters=k, kernel_size=4, strides=2, padding='same', use_bias=use_bias)(x)
+    def ck(self, x, k, use_normalization, use_bias, stride):
+        x = Conv2D(filters=k, kernel_size=4, strides=stride, padding='same', use_bias=use_bias)(x)
         if use_normalization:
             x = self.normalization(axis=3, center=True, epsilon=1e-5)(x, training=True)
         x = LeakyReLU(alpha=0.2)(x)
@@ -234,10 +234,10 @@ class CycleGAN():
         input_img = Input(shape=img_shape)
 
         # Layers 1-4
-        x = self.ck(input_img, 64, False, True) #  Instance normalization is not used for this layer)
-        x = self.ck(x, 128, True, self.use_bias)
-        x = self.ck(x, 256, True, self.use_bias)
-        x = self.ck(x, 512, True, self.use_bias)
+        x = self.ck(input_img, 64, False, True, 2) #  Instance normalization is not used for this layer)
+        x = self.ck(x, 128, True, self.use_bias, 2)
+        x = self.ck(x, 256, True, self.use_bias, 2)
+        x = self.ck(x, 512, True, self.use_bias, 1)
 
         # Layer 5: Output
         if self.use_patchgan:
