@@ -31,7 +31,7 @@ class CycleGAN():
 
         # Parse input arguments
         os.environ["CUDA_VISIBLE_DEVICES"]=str(args.gpu)  # Select GPU device
-        image_folder = os.path.split(args.dataset)[-1]
+        image_folder = os.path.split(args.dataset.rstrip('/'))[-1]
         batch_size = args.batch
 
         # ======= Data ==========

@@ -32,7 +32,7 @@ class CycleGAN():
 
         # Parse input arguments
         os.environ["CUDA_VISIBLE_DEVICES"]=str(args.gpu)  # Select GPU device
-        self.model_subfolder = os.path.split(args.model)[-1]
+        self.model_subfolder = os.path.split(args.model.rstrip('/'))[-1]
 
         self.model_path = os.path.join('saved_models', self.model_subfolder)
         if not os.path.isdir(self.model_path):
