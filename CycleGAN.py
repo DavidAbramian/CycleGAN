@@ -256,7 +256,7 @@ class CycleGAN():
         x = self.ck(input_img, 64, False, True, 2) #  Instance normalization is not used for this layer)
         x = self.ck(x, 128, True, self.use_bias, 2)
         x = self.ck(x, 256, True, self.use_bias, 2)
-        x = self.ck(x, 512, True, self.use_bias, 2)
+        x = self.ck(x, 512, True, self.use_bias, 1)
 
         # Layer 5: Output
         if self.use_patchgan:
@@ -647,7 +647,7 @@ class CycleGAN():
 
         weights_path = '{}/{}_epoch_{}.hdf5'.format(model_out_dir, model.name, epoch)
         model.save_weights(weights_path)
-        
+
         model_path = '{}/{}_epoch_{}.json'.format(model_out_dir, model.name, epoch)
         model_json_string = model.to_json()
         with open(model_path, 'w') as outfile:
@@ -710,7 +710,7 @@ class ReflectionPadding2D(Layer):
     def call(self, x, mask=None):
         w_pad, h_pad = self.padding
         return tf.pad(x, [[0, 0], [h_pad, h_pad], [w_pad, w_pad], [0, 0]], 'REFLECT')
-        
+
     def get_config(self):
         config = {'padding': self.padding}
         base_config = super(ReflectionPadding2D, self).get_config()
@@ -771,5 +771,5 @@ if __name__ == '__main__':
     parser.add_argument('-g', '--gpu', type=int, default=0, help='ID of GPU on which to run')
     parser.add_argument('-b', '--batch', type=int, default=5, help='batch size to use during training')
     args = parser.parse_args()
-    
+
     CycleGAN(args)
