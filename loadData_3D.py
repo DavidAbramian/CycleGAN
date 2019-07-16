@@ -52,11 +52,19 @@ def load_data_3D(subfolder='', generator=False):
     trainB_volumes = create_volume_array(trainB_volume_names, trainB_path, volume_size_B, nr_of_channels_B)
     testA_volumes = create_volume_array(testA_volume_names, testA_path, volume_size_A, nr_of_channels_A)
     testB_volumes = create_volume_array(testB_volume_names, testB_path, volume_size_B, nr_of_channels_B)
-    
+
+    # Normalize input volumes
+    A995quant = np.quantile(np.vstack((trainA_volumes, testA_volumes)), 0.995)
+    B995quant = np.quantile(np.vstack((trainB_volumes, testB_volumes)), 0.995)
+
+    normConstant = np.max((A995quant, B995quant)) / 2
+
     return {"volume_size_A": volume_size_A, "nr_of_channels_A": nr_of_channels_A,
             "volume_size_B": volume_size_B, "nr_of_channels_B": nr_of_channels_B,
-            "trainA_volumes": trainA_volumes, "trainB_volumes": trainB_volumes,
-            "testA_volumes": testA_volumes, "testB_volumes": testB_volumes}
+            "trainA_volumes": np.clip(trainA_volumes/normConstant - 1, -1, 1),
+            "trainB_volumes": np.clip(trainB_volumes/normConstant - 1, -1, 1),
+            "testA_volumes": np.clip(testA_volumes/normConstant - 1, -1, 1),
+            "testB_volumes": np.clip(testB_volumes/normConstant - 1, -1, 1)}
 
 def load_test_data(subfolder='', generator=False):
 
@@ -117,10 +125,6 @@ def create_volume_array(volume_list, volume_path, volume_size, nr_of_channels):
         # Add third dimension if volume is 2D
         if nr_of_channels == 1:  # Gray scale volume -> MR volume
             volume = volume[:, :, :, np.newaxis]
-            
-        # Normalize volume with (max 8 bit value - 1)
-        volume = volume / (volume.max() / 2) - 1
-        # volume = volume / 127.5 - 1
             
         # Add volume to array
         volume_array[i, :, :, :, :] = volume
