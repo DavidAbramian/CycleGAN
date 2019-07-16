@@ -50,7 +50,7 @@ def load_data_3D(subfolder='', generator=False):
 
     trainA_volumes = create_volume_array(trainA_volume_names, trainA_path, volume_size_A, nr_of_channels_A)
     trainB_volumes = create_volume_array(trainB_volume_names, trainB_path, volume_size_B, nr_of_channels_B)
-    testA_volumes = create_volume_array(testA_volume_names, testA_path, volume_size_B, nr_of_channels_A)
+    testA_volumes = create_volume_array(testA_volume_names, testA_path, volume_size_A, nr_of_channels_A)
     testB_volumes = create_volume_array(testB_volume_names, testB_path, volume_size_B, nr_of_channels_B)
     
     return {"volume_size_A": volume_size_A, "nr_of_channels_A": nr_of_channels_A,
@@ -93,7 +93,7 @@ def load_test_data(subfolder='', generator=False):
         volume_size_B = vol_test_B.shape[0:-1]
         nr_of_channels_B = vol_test_B.shape[-1]
 
-    testA_volumes = create_volume_array(testA_volume_names, testA_path, volume_size_B, nr_of_channels_A)
+    testA_volumes = create_volume_array(testA_volume_names, testA_path, volume_size_A, nr_of_channels_A)
     testB_volumes = create_volume_array(testB_volume_names, testB_path, volume_size_B, nr_of_channels_B)
     
     return {"volume_size_A": volume_size_A, "nr_of_channels_A": nr_of_channels_A,

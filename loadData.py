@@ -50,7 +50,7 @@ def load_data(subfolder='', generator=False):
 
     trainA_images = create_image_array(trainA_image_names, trainA_path, image_size_A, nr_of_channels_A)
     trainB_images = create_image_array(trainB_image_names, trainB_path, image_size_B, nr_of_channels_B)
-    testA_images = create_image_array(testA_image_names, testA_path, image_size_B, nr_of_channels_A)
+    testA_images = create_image_array(testA_image_names, testA_path, image_size_A, nr_of_channels_A)
     testB_images = create_image_array(testB_image_names, testB_path, image_size_B, nr_of_channels_B)
     
     return {"image_size_A": image_size_A, "nr_of_channels_A": nr_of_channels_A,
@@ -94,7 +94,7 @@ def load_test_data(subfolder='', generator=False):
         image_size_B = im_test_B.shape[0:-1]
         nr_of_channels_B = im_test_B.shape[-1]
 
-    testA_images = create_image_array(testA_image_names, testA_path, image_size_B, nr_of_channels_A)
+    testA_images = create_image_array(testA_image_names, testA_path, image_size_A, nr_of_channels_A)
     testB_images = create_image_array(testB_image_names, testB_path, image_size_B, nr_of_channels_B)
     
     return {"image_size_A": image_size_A, "nr_of_channels_A": nr_of_channels_A,
