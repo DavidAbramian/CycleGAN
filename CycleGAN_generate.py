@@ -38,6 +38,14 @@ class CycleGAN():
         if not os.path.isdir(self.model_path):
             sys.exit(' Model ' + self.model_subfolder + ' does not exist')
             
+            
+        if not args.A2B and not args.B2A:  # If no argument is passed generate A2B and B2A
+            self.generate_A2B = True
+            self.generate_B2A = True
+        else:                            # If either argument is passed generate only A2B or B2A
+            self.generate_A2B = args.A2B
+            self.generate_B2A = args.B2A
+            
         # Custom layers
         self.custom_objects = {'InstanceNormalization':InstanceNormalization,
                           'ReflectionPadding2D':ReflectionPadding2D}
@@ -92,64 +100,67 @@ class CycleGAN():
             image = (image+1) / 2
             mpimage.imsave(save_path, image)
 
-    def generate_synthetic_images(self):        
-        # Find all A2B generator models in folder
-        generator_models = sorted(glob.glob(os.path.join(self.model_path,'G_A2B*.json')))
+    def generate_synthetic_images(self):
         
-        for path_to_model in generator_models:
-            path_to_weights = path_to_model[:-5] + '.hdf5'
+        if self.generate_A2B:
+            # Find all A2B generator models in folder
+            generator_models = sorted(glob.glob(os.path.join(self.model_path,'G_A2B*.json')))
             
-            self.G_A2B = self.load_model_and_weights(path_to_model, path_to_weights)
-            
-            synthetic_images_B = self.G_A2B.predict(self.A_test)
-
-            epoch_string_start = path_to_model.find('epoch')
-            epoch_string = path_to_model[epoch_string_start:-5]
-            
-            out_dir = save_path = os.path.join('generated_images', self.model_subfolder, epoch_string, 'A2B')
-            if not os.path.isdir(out_dir):
-                os.makedirs(out_dir)
-
-            # Test B images
-            for i in range(synthetic_images_B.shape[0]):
-                synt_B = synthetic_images_B[i]
+            for path_to_model in generator_models:
+                path_to_weights = path_to_model[:-5] + '.hdf5'
                 
-                # Get the name from the image it was conditioned on
-                out_name = self.testA_image_names[i][:-4] + '_synthetic.png'
-                save_path = os.path.join(out_dir, out_name)
+                self.G_A2B = self.load_model_and_weights(path_to_model, path_to_weights)
                 
-                self.save_image(synt_B, save_path)
-            
-            print('G_A2B, {} synthetic images generated, {}'.format(synthetic_images_B.shape[0], epoch_string))
-        
-        # Find all B2A generator models in folder    
-        generator_models = sorted(glob.glob(os.path.join(self.model_path,'G_B2A*.json')))
-        
-        for path_to_model in generator_models:
-            path_to_weights = path_to_model[:-5] + '.hdf5'
-            
-            self.G_B2A = self.load_model_and_weights(path_to_model, path_to_weights)
-            
-            synthetic_images_A = self.G_B2A.predict(self.B_test)
+                synthetic_images_B = self.G_A2B.predict(self.A_test)
+    
+                epoch_string_start = path_to_model.find('epoch')
+                epoch_string = path_to_model[epoch_string_start:-5]
+                
+                out_dir = save_path = os.path.join('generated_images', self.model_subfolder, epoch_string, 'A2B')
+                if not os.path.isdir(out_dir):
+                    os.makedirs(out_dir)
+    
+                # Test B images
+                for i in range(synthetic_images_B.shape[0]):
+                    synt_B = synthetic_images_B[i]
+                    
+                    # Get the name from the image it was conditioned on
+                    out_name = self.testA_image_names[i][:-4] + '_synthetic.png'
+                    save_path = os.path.join(out_dir, out_name)
+                    
+                    self.save_image(synt_B, save_path)
+                
+                print('G_A2B, {} synthetic images generated, {}'.format(synthetic_images_B.shape[0], epoch_string))
 
-            epoch_string_start = path_to_model.find('epoch')
-            epoch_string = path_to_model[epoch_string_start:-5]
+        if self.generate_B2A:
+            # Find all B2A generator models in folder
+            generator_models = sorted(glob.glob(os.path.join(self.model_path,'G_B2A*.json')))
             
-            out_dir = save_path = os.path.join('generated_images', self.model_subfolder, epoch_string, 'B2A')
-            if not os.path.isdir(out_dir):
-                os.makedirs(out_dir)
+            for path_to_model in generator_models:
+                path_to_weights = path_to_model[:-5] + '.hdf5'
+                
+                self.G_B2A = self.load_model_and_weights(path_to_model, path_to_weights)
+                
+                synthetic_images_A = self.G_B2A.predict(self.B_test)
+    
+                epoch_string_start = path_to_model.find('epoch')
+                epoch_string = path_to_model[epoch_string_start:-5]
+                
+                out_dir = save_path = os.path.join('generated_images', self.model_subfolder, epoch_string, 'B2A')
+                if not os.path.isdir(out_dir):
+                    os.makedirs(out_dir)
+    
+                # Test A images
+                for i in range(synthetic_images_A.shape[0]):
+                    synt_A = synthetic_images_A[i]
+                    
+                    # Get the name from the image it was conditioned on
+                    out_name = self.testB_image_names[i][:-4] + '_synthetic.png'
+                    save_path = os.path.join(out_dir, out_name)
+                    
+                    self.save_image(synt_A, save_path)
 
-            # Test A images
-            for i in range(synthetic_images_A.shape[0]):
-                synt_A = synthetic_images_A[i]
-                
-                # Get the name from the image it was conditioned on
-                out_name = self.testB_image_names[i][:-4] + '_synthetic.png'
-                save_path = os.path.join(out_dir, out_name)
-                
-                self.save_image(synt_A, save_path)
-            
-            print('G_B2A, {} synthetic images generated, {}'.format(synthetic_images_B.shape[0], epoch_string))
+                print('G_B2A, {} synthetic images generated, {}'.format(synthetic_images_B.shape[0], epoch_string))
 
 # reflection padding taken from
 # https://github.com/fastai/courses/blob/master/deeplearning2/neural-style.ipynb
@@ -170,8 +181,14 @@ class ReflectionPadding2D(Layer):
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
+
     parser.add_argument('model', help='name of the model on which to run CycleGAN (stored in saved_models/)')
     parser.add_argument('-g', '--gpu', type=int, default=0, help='ID of GPU on which to run')
+
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument("--A2B", action="store_true", help='Apply only A2B conversion')
+    group.add_argument("--B2A", action="store_true", help='Apply only B2A conversion')
+
     args = parser.parse_args()
     
     CycleGAN(args)
