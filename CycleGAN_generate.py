@@ -9,12 +9,9 @@ from keras.utils import plot_model
 from keras.engine.topology import Network
 
 import matplotlib.image as mpimage
+from progress.bar import Bar
 import numpy as np
 import glob
-import datetime
-import time
-import json
-import csv
 import sys
 import os
 
@@ -37,12 +34,22 @@ class CycleGAN():
         self.model_path = os.path.join('saved_models', self.model_subfolder)
         if not os.path.isdir(self.model_path):
             sys.exit(' Model ' + self.model_subfolder + ' does not exist')
-            
+
         if args.data:  # If data folder is provided, use it
             image_folder = args.data = os.path.split(args.data.rstrip('/'))[-1]
+            self.out_dir = os.path.join('generated_images', self.model_subfolder + '_data_' + image_folder)
         else:  # If data folder is not provided, guess from model name
             image_folder = self.model_subfolder[16:]
-            
+            self.out_dir = os.path.join('generated_images', self.model_subfolder)
+
+        if args.epochs:  # If epochs are provided, make a list
+            try:
+                self.epochs = [int(x) for x in args.epochs.split(',')]
+            except:
+                sys.exit(' Epochs must be a comma-separated list of integers')
+        else:  # If epochs are not provided, use all available
+            self.epochs = None
+
         if not args.A2B and not args.B2A:  # If no argument is passed, generate A2B and B2A
             self.generate_A2B = True
             self.generate_B2A = True
@@ -103,26 +110,33 @@ class CycleGAN():
             mpimage.imsave(save_path, image)
 
     def generate_synthetic_images(self):
+        print()
         
         if self.generate_A2B:
             # Find all A2B generator models in folder
             generator_models = sorted(glob.glob(os.path.join(self.model_path,'G_A2B*.json')))
             
             for path_to_model in generator_models:
+                epoch_string_start = path_to_model.find('epoch')
+                epoch_string = path_to_model[epoch_string_start:-5]
+                epoch = int(epoch_string[6:])
+
+                if not self.epochs == None and epoch not in self.epochs:  # Check if current epoch is in list
+                    continue
+                    
                 path_to_weights = path_to_model[:-5] + '.hdf5'
                 
+                print('G_A2B, {}, generating images... '.format(epoch_string))
                 self.G_A2B = self.load_model_and_weights(path_to_model, path_to_weights)
                 
                 synthetic_images_B = self.G_A2B.predict(self.A_test)
-    
-                epoch_string_start = path_to_model.find('epoch')
-                epoch_string = path_to_model[epoch_string_start:-5]
-                
-                out_dir = save_path = os.path.join('generated_images', self.model_subfolder, epoch_string, 'A2B')
+                    
+                out_dir = save_path = os.path.join(self.out_dir, epoch_string, 'A2B')
                 if not os.path.isdir(out_dir):
                     os.makedirs(out_dir)
     
                 # Test B images
+                bar = Bar('saving...', max=synthetic_images_B.shape[0])
                 for i in range(synthetic_images_B.shape[0]):
                     synt_B = synthetic_images_B[i]
                     
@@ -131,28 +145,34 @@ class CycleGAN():
                     save_path = os.path.join(out_dir, out_name)
                     
                     self.save_image(synt_B, save_path)
-                
-                print('G_A2B, {} synthetic images generated, {}'.format(synthetic_images_B.shape[0], epoch_string))
+                    bar.next()
+                bar.finish()
 
         if self.generate_B2A:
             # Find all B2A generator models in folder
             generator_models = sorted(glob.glob(os.path.join(self.model_path,'G_B2A*.json')))
             
             for path_to_model in generator_models:
-                path_to_weights = path_to_model[:-5] + '.hdf5'
+                epoch_string_start = path_to_model.find('epoch')
+                epoch_string = path_to_model[epoch_string_start:-5]
+                epoch = int(epoch_string[6:])
+                            
+                if not self.epochs == None and epoch not in self.epochs:  # Check if current epoch is in list
+                    continue
                 
+                path_to_weights = path_to_model[:-5] + '.hdf5'
+
+                print('G_B2A, {}, generating images... '.format(epoch_string))
                 self.G_B2A = self.load_model_and_weights(path_to_model, path_to_weights)
                 
                 synthetic_images_A = self.G_B2A.predict(self.B_test)
-    
-                epoch_string_start = path_to_model.find('epoch')
-                epoch_string = path_to_model[epoch_string_start:-5]
                 
-                out_dir = save_path = os.path.join('generated_images', self.model_subfolder, epoch_string, 'B2A')
+                out_dir = save_path = os.path.join(self.out_dir, epoch_string, 'B2A')
                 if not os.path.isdir(out_dir):
                     os.makedirs(out_dir)
     
                 # Test A images
+                bar = Bar('saving...', max=synthetic_images_A.shape[0])
                 for i in range(synthetic_images_A.shape[0]):
                     synt_A = synthetic_images_A[i]
                     
@@ -161,8 +181,8 @@ class CycleGAN():
                     save_path = os.path.join(out_dir, out_name)
                     
                     self.save_image(synt_A, save_path)
-
-                print('G_B2A, {} synthetic images generated, {}'.format(synthetic_images_B.shape[0], epoch_string))
+                    bar.next()
+                bar.finish()
 
 # reflection padding taken from
 # https://github.com/fastai/courses/blob/master/deeplearning2/neural-style.ipynb
@@ -186,7 +206,9 @@ if __name__ == '__main__':
 
     parser.add_argument('model', help='name of the model on which to run CycleGAN, stored in saved_models/')
     parser.add_argument('-d', '--data', help='dataset on which to apply the model, stored in data/ (default: guessed from the model name)')
-    parser.add_argument('-g', '--gpu', type=int, default=0, help='ID of GPU on which to run')
+    parser.add_argument('-e', '--epochs', help='comma-separated list of model epochs to use (default: all available)')
+    
+    parser.add_argument('-g', '--gpu', type=int, default=0, help='ID of GPU on which to run (default: 0)')
 
     group = parser.add_mutually_exclusive_group()
     group.add_argument('-a', '--A2B', action='store_true', help='apply only A2B conversion')
