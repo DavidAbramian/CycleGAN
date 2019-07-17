@@ -32,17 +32,21 @@ class CycleGAN():
 
         # Parse input arguments
         os.environ["CUDA_VISIBLE_DEVICES"]=str(args.gpu)  # Select GPU device
-        self.model_subfolder = os.path.split(args.model.rstrip('/'))[-1]
 
+        self.model_subfolder = os.path.split(args.model.rstrip('/'))[-1]
         self.model_path = os.path.join('saved_models', self.model_subfolder)
         if not os.path.isdir(self.model_path):
             sys.exit(' Model ' + self.model_subfolder + ' does not exist')
             
+        if args.data:  # If data folder is provided, use it
+            image_folder = args.data = os.path.split(args.data.rstrip('/'))[-1]
+        else:  # If data folder is not provided, guess from model name
+            image_folder = self.model_subfolder[16:]
             
-        if not args.A2B and not args.B2A:  # If no argument is passed generate A2B and B2A
+        if not args.A2B and not args.B2A:  # If no argument is passed, generate A2B and B2A
             self.generate_A2B = True
             self.generate_B2A = True
-        else:                            # If either argument is passed generate only A2B or B2A
+        else:  # If either argument is passed, generate only A2B or B2A
             self.generate_A2B = args.A2B
             self.generate_B2A = args.B2A
             
@@ -50,8 +54,6 @@ class CycleGAN():
         self.custom_objects = {'InstanceNormalization':InstanceNormalization,
                           'ReflectionPadding2D':ReflectionPadding2D}
 
-        image_folder = self.model_subfolder[16:]
-        
         # ======= Data ==========
         print('--- Caching data ---')
 
@@ -182,12 +184,13 @@ if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('model', help='name of the model on which to run CycleGAN (stored in saved_models/)')
+    parser.add_argument('model', help='name of the model on which to run CycleGAN, stored in saved_models/')
+    parser.add_argument('-d', '--data', help='dataset on which to apply the model, stored in data/ (default: guessed from the model name)')
     parser.add_argument('-g', '--gpu', type=int, default=0, help='ID of GPU on which to run')
 
     group = parser.add_mutually_exclusive_group()
-    group.add_argument("--A2B", action="store_true", help='Apply only A2B conversion')
-    group.add_argument("--B2A", action="store_true", help='Apply only B2A conversion')
+    group.add_argument('-a', '--A2B', action='store_true', help='apply only A2B conversion')
+    group.add_argument('-b', '--B2A', action='store_true', help='apply only B2A conversion')
 
     args = parser.parse_args()
     
