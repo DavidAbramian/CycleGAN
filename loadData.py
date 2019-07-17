@@ -7,7 +7,7 @@ import numpy as np
 import matplotlib.image as mpimage
 from progress.bar import Bar
 
-def load_data(subfolder='', generator=False):
+def load_data(subfolder=''):
 
     dataset_path = os.path.join('data', subfolder)
     if not os.path.isdir(dataset_path):
@@ -58,7 +58,7 @@ def load_data(subfolder='', generator=False):
             "trainA_images": trainA_images, "trainB_images": trainB_images,
             "testA_images": testA_images, "testB_images": testB_images}
 
-def load_test_data(subfolder='', generator=False):
+def load_test_data(subfolder=''):
 
     dataset_path = os.path.join('data', subfolder)
     if not os.path.isdir(dataset_path):
