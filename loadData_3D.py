@@ -7,7 +7,7 @@ import nibabel as nib
 
 from progress.bar import Bar
 
-def load_data_3D(subfolder='', generator=False):
+def load_data_3D(subfolder=''):
 
     dataset_path = os.path.join('data', subfolder)
     if not os.path.isdir(dataset_path):
@@ -66,7 +66,7 @@ def load_data_3D(subfolder='', generator=False):
             "testA_volumes": np.clip(testA_volumes/normConstant - 1, -1, 1),
             "testB_volumes": np.clip(testB_volumes/normConstant - 1, -1, 1)}
 
-def load_test_data(subfolder='', generator=False):
+def load_test_data(subfolder=''):
 
     dataset_path = os.path.join('data', subfolder)
     if not os.path.isdir(dataset_path):
