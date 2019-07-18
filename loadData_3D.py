@@ -73,20 +73,26 @@ def load_test_data(subfolder=''):
         sys.exit(' Dataset ' + subfolder + ' does not exist')
 
     # volume paths
+    trainA_path = os.path.join(dataset_path, 'trainA')
+    trainB_path = os.path.join(dataset_path, 'trainB')
     testA_path = os.path.join(dataset_path, 'testA')
     testB_path = os.path.join(dataset_path, 'testB')
 
     # volume file names
+    trainA_volume_names = sorted(glob.glob(os.path.join(trainA_path,'*.nii.gz')))
+    trainB_volume_names = sorted(glob.glob(os.path.join(trainB_path,'*.nii.gz')))
     testA_volume_names = sorted(glob.glob(os.path.join(testA_path,'*.nii.gz')))
     testB_volume_names = sorted(glob.glob(os.path.join(testB_path,'*.nii.gz')))
 
+    trainA_volume_names = [os.path.basename(x) for x in trainA_volume_names]
+    trainB_volume_names = [os.path.basename(x) for x in trainB_volume_names]
     testA_volume_names = [os.path.basename(x) for x in testA_volume_names]
     testB_volume_names = [os.path.basename(x) for x in testB_volume_names]
 
     # Examine one volume to get size and number of channels
-    vol_test_A = nib.load(os.path.join(testA_path, testA_volume_names[0]))
-    vol_test_B = nib.load(os.path.join(testB_path, testB_volume_names[0]))    
-    
+    vol_test_A = nib.load(os.path.join(trainA_path, trainA_volume_names[0]))
+    vol_test_B = nib.load(os.path.join(trainB_path, trainB_volume_names[0]))    
+
     if len(vol_test_A.shape) == 3:
         volume_size_A = vol_test_A.shape
         nr_of_channels_A = 1
@@ -101,14 +107,25 @@ def load_test_data(subfolder=''):
         volume_size_B = vol_test_B.shape[0:-1]
         nr_of_channels_B = vol_test_B.shape[-1]
 
+    trainA_volumes = create_volume_array(trainA_volume_names, trainA_path, volume_size_A, nr_of_channels_A)
+    trainB_volumes = create_volume_array(trainB_volume_names, trainB_path, volume_size_B, nr_of_channels_B)
     testA_volumes = create_volume_array(testA_volume_names, testA_path, volume_size_A, nr_of_channels_A)
     testB_volumes = create_volume_array(testB_volume_names, testB_path, volume_size_B, nr_of_channels_B)
+
+    # Normalize input volumes
+    A995quant = np.quantile(np.vstack((trainA_volumes, testA_volumes)), 0.995)
+    B995quant = np.quantile(np.vstack((trainB_volumes, testB_volumes)), 0.995)
+
+    normConstant = np.max((A995quant, B995quant)) / 2
     
     return {"volume_size_A": volume_size_A, "nr_of_channels_A": nr_of_channels_A,
             "volume_size_B": volume_size_B, "nr_of_channels_B": nr_of_channels_B,
-            "testA_volumes": testA_volumes, "testB_volumes": testB_volumes,
+            "testA_volumes": np.clip(testA_volumes/normConstant - 1, -1, 1),
+            "testB_volumes": np.clip(testB_volumes/normConstant - 1, -1, 1),
             "testA_volume_names": testA_volume_names,
-            "testB_volume_names": testB_volume_names}
+            "testB_volume_names": testB_volume_names,
+            "norm_const": normConstant}
+
 
 def create_volume_array(volume_list, volume_path, volume_size, nr_of_channels):
     bar = Bar('Loading...', max=len(volume_list))
