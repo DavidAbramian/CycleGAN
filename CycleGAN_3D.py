@@ -174,7 +174,7 @@ class CycleGAN():
                              loss_weights=compile_weights)
 
         # ===== Folders and configuration =====
-        self.date_time = time.strftime('%Y%m%d-%H%M%S', time.localtime()) + '-' + volume_folder
+        self.date_time = time.strftime('%Y%m%d-%H%M%S', time.localtime()) + '-' + volume_folder + args.tag
 
         # Output folder for run data and volumes
         self.out_dir = os.path.join('volumes', self.date_time)
@@ -827,6 +827,7 @@ if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('dataset', help='name of the dataset on which to run CycleGAN (stored in data/)')
+    parser.add_argument('tag', help='tag to remember specific settings for each training session')
     parser.add_argument('-g', '--gpu', type=int, default=0, help='ID of GPU on which to run')
     parser.add_argument('-b', '--batch', type=int, default=5, help='batch size to use during training')
     args = parser.parse_args()
