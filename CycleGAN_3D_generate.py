@@ -25,7 +25,7 @@ os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
 # np.random.seed(seed=12345)
 
 class CycleGAN():
-    def __init__(self, model_subfolder):
+    def __init__(self, args):
 
         # Parse input arguments
         os.environ["CUDA_VISIBLE_DEVICES"]=str(args.gpu)  # Select GPU device
