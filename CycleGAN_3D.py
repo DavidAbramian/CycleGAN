@@ -175,7 +175,7 @@ class CycleGAN():
                              loss_weights=compile_weights)
 
         # ===== Folders and configuration =====
-        self.date_time = time.strftime('%Y%m%d-%H%M%S', time.localtime()) + '-' + volume_folder
+        self.date_time = time.strftime('%Y%m%d-%H%M%S', time.localtime()) + '-' + volume_folder + args.tag
 
         # Output folder for run data and volumes
         self.out_dir = os.path.join('volumes', self.date_time)
@@ -835,6 +835,7 @@ if __name__ == '__main__':
     parser.add_argument('-b', '--batch', type=int, default=5, help='batch size to use during training (default: 5)')
     
     parser.add_argument('-g', '--gpu', type=int, default=0, help='ID of GPU on which to run (default: 0)')
+    parser.add_argument('-t', '--tag', help='tag to remember specific settings for each training session')
     
     args = parser.parse_args()
     
