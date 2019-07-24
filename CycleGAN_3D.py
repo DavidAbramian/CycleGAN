@@ -97,8 +97,9 @@ class CycleGAN():
         self.use_patchgan = True  # PatchGAN - if false the discriminator learning rate should be decreased
         self.use_resize_convolution = False  # Resize convolution - instead of transpose convolution in deconvolution layers (uk) - can reduce checkerboard artifacts but the blurring might affect the cycle-consistency
         self.discriminator_sigmoid = True
-        self.generator_residual_layers = 9
-        self.base_discirminator_filters = 64
+        self.generator_residual_blocks = args.resBlocks
+        self.base_discirminator_filters = args.baseDiscFilts
+        self.base_generator_filters = args.baseGenFilts
 
         # Tweaks
         self.REAL_LABEL = 1.0  # Use e.g. 0.9 to avoid training the discriminators to zero loss
@@ -288,19 +289,19 @@ class CycleGAN():
         # Layer 1: Input
         input_vol = Input(shape=vol_shape_in)
         x = ReflectionPadding3D((3, 3, 3))(input_vol)
-        x = self.c7Ak(x, 32)
+        x = self.c7Ak(x, self.base_generator_filters)
 
         # Layer 2-3: Downsampling
-        x = self.dk(x, 64)
-        x = self.dk(x, 128)
+        x = self.dk(x, 2*self.base_generator_filters)
+        x = self.dk(x, 4*self.base_generator_filters)
 
         # Layers 4-12: Residual blocks
-        for _ in range(4, 4 + self.generator_residual_layers):
+        for _ in range(4, 4 + self.generator_residual_blocks):
             x = self.Rk(x)
 
         # Layer 13:14: Upsampling
-        x = self.uk(x, 64)
-        x = self.uk(x, 32)
+        x = self.uk(x, 2*self.base_generator_filters)
+        x = self.uk(x, self.base_generator_filters)
 
         # Layer 15: Output
         x = ReflectionPadding3D((3, 3, 3))(x)
@@ -827,8 +828,14 @@ if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('dataset', help='name of the dataset on which to run CycleGAN (stored in data/)')
-    parser.add_argument('-g', '--gpu', type=int, default=0, help='ID of GPU on which to run')
-    parser.add_argument('-b', '--batch', type=int, default=5, help='batch size to use during training')
+    
+    parser.add_argument('-r', '--resBlocks', type=int, default=9, help='number of residual blocks used in the generators (default: 9)')
+    parser.add_argument('-df', '--baseDiscFilts', type=int, default=64, help='number of filters in the first discriminator layer (default: 64)')
+    parser.add_argument('-gf', '--baseGenFilts', type=int, default=32, help='number of filters in the first generator layer (default: 32)')
+    parser.add_argument('-b', '--batch', type=int, default=5, help='batch size to use during training (default: 5)')
+    
+    parser.add_argument('-g', '--gpu', type=int, default=0, help='ID of GPU on which to run (default: 0)')
+    
     args = parser.parse_args()
     
     CycleGAN(args)
