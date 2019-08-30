@@ -18,7 +18,7 @@ import os
 import keras.backend as K
 import tensorflow as tf
 
-from loadData_3D import load_test_data
+from loadData_3D import load_test_data_3D
 
 os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
 
@@ -64,13 +64,15 @@ class CycleGAN():
         # ======= Data ==========
         print('--- Caching data ---')
 
-        data = load_test_data(subfolder=data_folder)
+        data = load_test_data_3D(subfolder=data_folder)
 
         self.channels_A = data["nr_of_channels_A"]
         self.vol_shape_A = data["volume_size_A"] + (self.channels_A,)
+        self.header_A = data["header_A"]
 
         self.channels_B = data["nr_of_channels_B"]
         self.vol_shape_B = data["volume_size_B"] + (self.channels_B,)
+        self.header_B = data["header_B"]
 
         print('Volume A shape: ', self.vol_shape_A)
         print('Volume B shape: ', self.vol_shape_B)
@@ -103,9 +105,9 @@ class CycleGAN():
         model.load_weights(path_to_weights)
         return model
 
-    def save_volume(self, volume, save_path):
+    def save_volume(self, volume, header, save_path):
         volume = (volume + 1) * self.norm_const  # Undo normalization
-        img = nib.Nifti1Image(volume.astype("float32"), np.eye(4))
+        img = nib.Nifti1Image(volume.astype("float32"), None, header)
         nib.save(img, save_path)
 
         # if image.shape[2] == 1:
@@ -150,7 +152,7 @@ class CycleGAN():
                     out_name = self.testA_volume_names[i][:-7] + '_synthetic.nii.gz'
                     save_path = os.path.join(out_dir, out_name)
                     
-                    self.save_volume(synt_B, save_path)
+                    self.save_volume(synt_B, self.header_B, save_path)
                     bar.next()
                 bar.finish()
 
@@ -186,7 +188,7 @@ class CycleGAN():
                     out_name = self.testB_volume_names[i][:-7] + '_synthetic.nii.gz'
                     save_path = os.path.join(out_dir, out_name)
                     
-                    self.save_volume(synt_A, save_path)
+                    self.save_volume(synt_A, self.header_A, save_path)
                     bar.next()
                 bar.finish()
 

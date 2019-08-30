@@ -175,7 +175,7 @@ class CycleGAN():
                              loss_weights=compile_weights)
 
         # ===== Folders and configuration =====
-        if args.tag == '':
+        if args.tag == None:
             nDiscFiltsStride2 = np.log2(self.D_A.input_shape[1] / self.D_A.output_shape[1])
             receptField = int((16 - 3*nDiscFiltsStride2) * 2**nDiscFiltsStride2 + 2**(nDiscFiltsStride2 + 1) - 2)
             self.tag = '_LR_{}_RL_{}_DF_{}_GF_{}_RF_{}'.format(self.learning_rate_D, self.generator_residual_blocks, self.base_discirminator_filters, self.base_generator_filters, receptField)
@@ -841,7 +841,7 @@ if __name__ == '__main__':
     parser.add_argument('-b', '--batch', type=int, default=5, help='batch size to use during training (default: 5)')
     
     parser.add_argument('-g', '--gpu', type=int, default=0, help='ID of GPU on which to run (default: 0)')
-    parser.add_argument('-t', '--tag', default='', help='tag to remember specific settings for each training session')
+    parser.add_argument('-t', '--tag', help='tag to remember specific settings for each training session (default: generate automatically)')
     
     args = parser.parse_args()
     
