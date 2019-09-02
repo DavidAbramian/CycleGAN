@@ -12,6 +12,7 @@ import nibabel as nib
 from progress.bar import Bar
 import numpy as np
 import glob
+import json
 import sys
 import os
 
@@ -31,16 +32,19 @@ class CycleGAN():
         os.environ["CUDA_VISIBLE_DEVICES"]=str(args.gpu)  # Select GPU device
 
         self.model_subfolder = os.path.split(args.model.rstrip('/'))[-1]
-        self.model_path = os.path.join('saved_models', self.model_subfolder)
+        self.model_path = os.path.join('runs', self.model_subfolder, 'models')
         if not os.path.isdir(self.model_path):
             sys.exit(' Model ' + self.model_subfolder + ' does not exist')
 
         if args.data:  # If data folder is provided, use it
-            data_folder = args.data = os.path.split(args.data.rstrip('/'))[-1]
-            self.out_dir = os.path.join('generated_volumes', self.model_subfolder + '_data_' + data_folder)
-        else:  # If data folder is not provided, guess from model name
-            data_folder = self.model_subfolder[16:]
-            self.out_dir = os.path.join('generated_volumes', self.model_subfolder)
+            data_folder = os.path.split(args.data.rstrip('/'))[-1]
+        else:  # If data folder is not provided, read from metadata
+            with open(os.path.join('runs', self.model_subfolder, 'metadata.json'), 'r') as metadata_json:
+                metadata = json.load(metadata_json)
+                
+            data_folder = metadata["volume_folder"]
+        
+        self.out_dir = os.path.join('runs', self.model_subfolder, 'synthetic_volumes', data_folder)
 
         if args.epochs:  # If epochs are provided, make a list
             try:

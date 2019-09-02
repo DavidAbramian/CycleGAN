@@ -31,13 +31,13 @@ class CycleGAN():
 
         # Parse input arguments
         os.environ["CUDA_VISIBLE_DEVICES"]=str(args.gpu)  # Select GPU device
-        image_folder = os.path.split(args.dataset.rstrip('/'))[-1]
+        self.image_folder = os.path.split(args.dataset.rstrip('/'))[-1]
         batch_size = args.batch
 
         # ======= Data ==========
         print('--- Caching data ---')
 
-        data = load_data(subfolder=image_folder)
+        data = load_data(subfolder=self.image_folder)
 
         self.channels_A = data["nr_of_channels_A"]
         self.img_shape_A = data["image_size_A"] + (self.channels_A,)
@@ -159,18 +159,23 @@ class CycleGAN():
                              loss_weights=compile_weights)
 
         # ===== Folders and configuration =====
-        self.date_time = time.strftime('%Y%m%d-%H%M%S', time.localtime()) + '-' + image_folder
+        self.date_time = time.strftime('%Y%m%d-%H%M%S', time.localtime()) + '-' + self.image_folder
 
         # Output folder for run data and images
-        self.out_dir = os.path.join('images', self.date_time)
+        self.out_dir = os.path.join('runs', self.date_time)
         if not os.path.exists(self.out_dir):
             os.makedirs(self.out_dir)
+        
+        if self.save_training_img:
+            self.out_dir_images = os.path.join(self.out_dir, 'training_images')
+            if not os.path.exists(self.out_dir_images):
+                os.makedirs(self.out_dir_images)
 
         # Output folder for saved models
         if self.save_models:
-            self.model_out_dir = os.path.join('saved_models', self.date_time)
-            if not os.path.exists(self.model_out_dir):
-                os.makedirs(self.model_out_dir)
+            self.out_dir_models = os.path.join(self.out_dir, 'models')
+            if not os.path.exists(self.out_dir_models):
+                os.makedirs(self.out_dir_models)
 
         self.write_metadata_to_JSON()
 
@@ -386,10 +391,10 @@ class CycleGAN():
         # Begin training
         # ======================================================================
         if self.save_training_img:
-            os.makedirs(os.path.join(self.out_dir, 'train_A'))
-            os.makedirs(os.path.join(self.out_dir, 'train_B'))
-            os.makedirs(os.path.join(self.out_dir, 'test_A'))
-            os.makedirs(os.path.join(self.out_dir, 'test_B'))
+            os.makedirs(os.path.join(self.out_dir_images, 'train_A'))
+            os.makedirs(os.path.join(self.out_dir_images, 'train_B'))
+            os.makedirs(os.path.join(self.out_dir_images, 'test_A'))
+            os.makedirs(os.path.join(self.out_dir_images, 'test_B'))
 
         D_A_losses = []
         D_B_losses = []
@@ -521,8 +526,8 @@ class CycleGAN():
             synthetic_image_B = np.tile(synthetic_image_B, [1,1,3])
             reconstructed_image_B = np.tile(reconstructed_image_B, [1,1,3])
 
-        save_path_A = '{}/train_A/epoch{}.png'.format(self.out_dir, epoch)
-        save_path_B = '{}/train_B/epoch{}.png'.format(self.out_dir, epoch)
+        save_path_A = '{}/train_A/epoch{}.png'.format(self.out_dir_images, epoch)
+        save_path_B = '{}/train_B/epoch{}.png'.format(self.out_dir_images, epoch)
         if self.paired_data:
             real_image_Ab = self.B_train[rand_ind_A]
             real_image_Ba = self.A_train[rand_ind_B]
@@ -557,8 +562,8 @@ class CycleGAN():
             synthetic_image_B = np.tile(synthetic_image_B, [1,1,3])
             reconstructed_image_B = np.tile(reconstructed_image_B, [1,1,3])
 
-        save_path_A = '{}/test_A/epoch{}.png'.format(self.out_dir, epoch)
-        save_path_B = '{}/test_B/epoch{}.png'.format(self.out_dir, epoch)
+        save_path_A = '{}/test_A/epoch{}.png'.format(self.out_dir_images, epoch)
+        save_path_B = '{}/test_B/epoch{}.png'.format(self.out_dir_images, epoch)
         if self.paired_data:
             real_image_Ab = self.B_test[0]
             real_image_Ba = self.A_test[0]
@@ -640,15 +645,10 @@ class CycleGAN():
 # Save and load
 
     def save_model(self, model, epoch):
-        # Create folder to save model architecture and weights
-        model_out_dir = os.path.join('saved_models', self.date_time)
-        if not os.path.exists(model_out_dir):
-            os.makedirs(model_out_dir)
-
-        weights_path = '{}/{}_epoch_{}.hdf5'.format(model_out_dir, model.name, epoch)
+        weights_path = '{}/{}_epoch_{}.hdf5'.format(self.out_dir_models, model.name, epoch)
         model.save_weights(weights_path)
 
-        model_path = '{}/{}_epoch_{}.json'.format(model_out_dir, model.name, epoch)
+        model_path = '{}/{}_epoch_{}.json'.format(self.out_dir_models, model.name, epoch)
         model_json_string = model.to_json()
         with open(model_path, 'w') as outfile:
             outfile.write(model_json_string)
@@ -656,16 +656,14 @@ class CycleGAN():
 
     def write_loss_data_to_file(self, history):
         keys = sorted(history.keys())
-        with open('images/{}/loss_output.csv'.format(self.date_time), 'w') as csv_file:
+        with open('runs/{}/loss_output.csv'.format(self.date_time), 'w') as csv_file:
             writer = csv.writer(csv_file, delimiter=',')
             writer.writerow(keys)
             writer.writerows(zip(*[history[key] for key in keys]))
 
     def write_metadata_to_JSON(self):
-        # Save meta_data
-        data = {}
-        data['meta_data'] = []
-        data['meta_data'].append({
+        # Save metadata
+        metadata = {
             'img shape_A: height,width,channels': self.img_shape_A,
             'img shape_B: height,width,channels': self.img_shape_B,
             'batch size': self.batch_size,
@@ -691,10 +689,11 @@ class CycleGAN():
             'number of B test examples': len(self.B_test),
             'discriminator sigmoid': self.discriminator_sigmoid,
             'resize convolution': self.use_resize_convolution,
-        })
+            'image_folder': self.image_folder
+        }
 
-        with open('{}/meta_data.json'.format(self.out_dir), 'w') as outfile:
-            json.dump(data, outfile, sort_keys=True)
+        with open('{}/metadata.json'.format(self.out_dir), 'w') as outfile:
+            json.dump(metadata, outfile, sort_keys=True)
 
 # reflection padding taken from
 # https://github.com/fastai/courses/blob/master/deeplearning2/neural-style.ipynb
