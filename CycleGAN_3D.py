@@ -175,33 +175,26 @@ class CycleGAN():
                              loss_weights=compile_weights)
 
         # ===== Folders and configuration =====
-        # if args.tag == None:
-        #     # Calculate receptive field
-        #     nDiscFiltsStride2 = np.log2(self.D_A.input_shape[1] / self.D_A.output_shape[1])
-        #     receptField = int((16 - 3*nDiscFiltsStride2) * 2**nDiscFiltsStride2 + 2**(nDiscFiltsStride2 + 1) - 2)
-        #     
-        #     # Generate tag
-        #     self.tag = '_LR_{}_RL_{}_DF_{}_GF_{}_RF_{}'.format(self.learning_rate_D, self.generator_residual_blocks, self.base_discirminator_filters, self.base_generator_filters, receptField)
-        # else:
-        #     self.tag = args.tag
-        
         if args.tag:
             # Calculate receptive field
             nDiscFiltsStride2 = np.log2(self.D_A.input_shape[1] / self.D_A.output_shape[1])
             receptField = int((16 - 3*nDiscFiltsStride2) * 2**nDiscFiltsStride2 + 2**(nDiscFiltsStride2 + 1) - 2)
-            
+
             # Generate tag
             self.tag = '_LR_{}_RL_{}_DF_{}_GF_{}_RF_{}'.format(self.learning_rate_D, self.generator_residual_blocks, self.base_discirminator_filters, self.base_generator_filters, receptField)
         else:
-            self.tag = ''   
-            
+            self.tag = ''
+
+        if args.extra_tag:
+            self.tag = self.tag + '_' + args.extra_tag
+
         self.date_time = time.strftime('%Y%m%d-%H%M%S', time.localtime()) + '-' + self.volume_folder + self.tag
 
         # Output folder for run data and volumes
         self.out_dir = os.path.join('runs', self.date_time)
         if not os.path.exists(self.out_dir):
             os.makedirs(self.out_dir)
-            
+
         if self.save_training_vol:
             self.out_dir_volumes = os.path.join(self.out_dir, 'training_volumes')
             if not os.path.exists(self.out_dir_volumes):
@@ -421,8 +414,8 @@ class CycleGAN():
                 # Save temporary images continously
                 self.save_tmp_images(real_volumes_A[0], real_volumes_B[0],
                                     synthetic_volumes_A[0], synthetic_volumes_B[0])
-                
-                
+
+
 
         # ======================================================================
         # Begin training
@@ -624,7 +617,7 @@ class CycleGAN():
         save_path_B = '{}/test_B/epoch{}.nii.gz'.format(self.out_dir_volumes, epoch)
 
         if self.paired_data:
-            real_volume_Ab = self.B_test[rand_ind_A] 
+            real_volume_Ab = self.B_test[rand_ind_A]
             real_volume_Ba = self.A_test[rand_ind_B]
 
             # # Add dimensions if A and B have different number of channels
@@ -727,7 +720,7 @@ class CycleGAN():
     def save_model(self, model, epoch):
         weights_path = '{}/{}_epoch_{}.hdf5'.format(self.out_dir_models, model.name, epoch)
         model.save_weights(weights_path)
-        
+
         model_path = '{}/{}_epoch_{}.json'.format(self.out_dir_models, model.name, epoch)
         model_json_string = model.to_json()
         with open(model_path, 'w') as outfile:
@@ -770,7 +763,7 @@ class CycleGAN():
             'discriminator sigmoid': self.discriminator_sigmoid,
             'resize convolution': self.use_resize_convolution,
             'tag': self.tag,
-            'volume_folder': self.volume_folder 
+            'volume_folder': self.volume_folder
         }
 
         with open('{}/metadata.json'.format(self.out_dir), 'w') as outfile:
@@ -790,7 +783,7 @@ class ReflectionPadding3D(Layer):
     def call(self, x, mask=None):
         w_pad, h_pad, d_pad = self.padding
         return tf.pad(x, [[0, 0], [h_pad, h_pad], [w_pad, w_pad], [d_pad, d_pad], [0, 0]], 'REFLECT')
-        
+
     def get_config(self):
         config = {'padding': self.padding}
         base_config = super(ReflectionPadding3D, self).get_config()
@@ -848,17 +841,17 @@ if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('dataset', help='name of the dataset on which to run CycleGAN (stored in data/)')
-    
+
     parser.add_argument('-r', '--resBlocks', type=int, default=9, help='number of residual blocks used in the generators (default: 9)')
     parser.add_argument('-df', '--baseDiscFilts', type=int, default=64, help='number of filters in the first discriminator layer (default: 64)')
     parser.add_argument('-gf', '--baseGenFilts', type=int, default=32, help='number of filters in the first generator layer (default: 32)')
     parser.add_argument('-b', '--batch', type=int, default=5, help='batch size to use during training (default: 5)')
-    
+
     parser.add_argument('-g', '--gpu', type=int, default=0, help='ID of GPU on which to run (default: 0)')
     # parser.add_argument('-t', '--tag', help='tag to remember specific settings for each training session (default: generate automatically)')
     parser.add_argument('-t', '--tag', action='store_true', help='tag to remember specific settings for each training session (default: no tag)')
-    
-    args = parser.parse_args()
-    
-    CycleGAN(args)
+    parser.add_argument('-x', '--extra_tag', default='', help='user-defined additional tag (default: no tag)')
 
+    args = parser.parse_args()
+
+    CycleGAN(args)
