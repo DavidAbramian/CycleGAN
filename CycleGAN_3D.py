@@ -82,6 +82,7 @@ class CycleGAN():
         self.epochs = 200  # choose multiples of 20 since the models are saved each 20th epoch
 
         self.save_models = True  # Save or not the generator and discriminator models
+        self.save_models_interval = 20  # Number of epoch between saves of generator and discriminator models
         self.save_training_vol = True  # Save or not example training results or only tmp.png
         self.save_training_vol_interval = 1  # Number of epoch between saves of intermediate training results
         self.tmp_vol_update_frequency = 3  # Number of batches between updates of tmp.png
@@ -489,7 +490,7 @@ class CycleGAN():
                 self.save_epoch_volumes(epoch)
 
             # Save model
-            if self.save_models and epoch % 20 == 0:
+            if self.save_models and epoch % self.save_models_interval == 0:
                 self.save_model(self.D_A, epoch)
                 self.save_model(self.D_B, epoch)
                 self.save_model(self.G_A2B, epoch)
