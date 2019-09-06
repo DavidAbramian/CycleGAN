@@ -42,13 +42,13 @@ class CycleGAN():
 
         # Parse input arguments
         os.environ["CUDA_VISIBLE_DEVICES"]=str(args.gpu)  # Select GPU device
-        volume_folder = os.path.split(args.dataset.rstrip('/'))[-1]
+        self.volume_folder = os.path.split(args.dataset.rstrip('/'))[-1]
         batch_size = args.batch
 
         # ======= Data ==========
         print('--- Caching data ---')
 
-        data = load_data_3D(subfolder=volume_folder)
+        data = load_data_3D(subfolder=self.volume_folder)
 
         self.channels_A = data["nr_of_channels_A"]
         self.vol_shape_A = data["volume_size_A"] + (self.channels_A,)
@@ -97,8 +97,9 @@ class CycleGAN():
         self.use_patchgan = True  # PatchGAN - if false the discriminator learning rate should be decreased
         self.use_resize_convolution = False  # Resize convolution - instead of transpose convolution in deconvolution layers (uk) - can reduce checkerboard artifacts but the blurring might affect the cycle-consistency
         self.discriminator_sigmoid = True
-        self.generator_residual_layers = 9
-        self.base_discirminator_filters = 64
+        self.generator_residual_blocks = args.resBlocks
+        self.base_discirminator_filters = args.baseDiscFilts
+        self.base_generator_filters = args.baseGenFilts
 
         # Tweaks
         self.REAL_LABEL = 1.0  # Use e.g. 0.9 to avoid training the discriminators to zero loss
@@ -174,18 +175,36 @@ class CycleGAN():
                              loss_weights=compile_weights)
 
         # ===== Folders and configuration =====
-        self.date_time = time.strftime('%Y%m%d-%H%M%S', time.localtime()) + '-' + volume_folder
+        if args.tag:
+            # Calculate receptive field
+            nDiscFiltsStride2 = np.log2(self.D_A.input_shape[1] / self.D_A.output_shape[1])
+            receptField = int((16 - 3*nDiscFiltsStride2) * 2**nDiscFiltsStride2 + 2**(nDiscFiltsStride2 + 1) - 2)
+
+            # Generate tag
+            self.tag = '_LR_{}_RL_{}_DF_{}_GF_{}_RF_{}'.format(self.learning_rate_D, self.generator_residual_blocks, self.base_discirminator_filters, self.base_generator_filters, receptField)
+        else:
+            self.tag = ''
+
+        if args.extra_tag:
+            self.tag = self.tag + '_' + args.extra_tag
+
+        self.date_time = time.strftime('%Y%m%d-%H%M%S', time.localtime()) + '-' + self.volume_folder + self.tag
 
         # Output folder for run data and volumes
-        self.out_dir = os.path.join('volumes', self.date_time)
+        self.out_dir = os.path.join('runs', self.date_time)
         if not os.path.exists(self.out_dir):
             os.makedirs(self.out_dir)
 
+        if self.save_training_vol:
+            self.out_dir_volumes = os.path.join(self.out_dir, 'training_volumes')
+            if not os.path.exists(self.out_dir_volumes):
+                os.makedirs(self.out_dir_volumes)
+
         # Output folder for saved models
         if self.save_models:
-            self.model_out_dir = os.path.join('saved_models', self.date_time)
-            if not os.path.exists(self.model_out_dir):
-                os.makedirs(self.model_out_dir)
+            self.out_dir_models = os.path.join(self.out_dir, 'models')
+            if not os.path.exists(self.out_dir_models):
+                os.makedirs(self.out_dir_models)
 
         self.write_metadata_to_JSON()
 
@@ -288,19 +307,19 @@ class CycleGAN():
         # Layer 1: Input
         input_vol = Input(shape=vol_shape_in)
         x = ReflectionPadding3D((3, 3, 3))(input_vol)
-        x = self.c7Ak(x, 32)
+        x = self.c7Ak(x, self.base_generator_filters)
 
         # Layer 2-3: Downsampling
-        x = self.dk(x, 64)
-        x = self.dk(x, 128)
+        x = self.dk(x, 2*self.base_generator_filters)
+        x = self.dk(x, 4*self.base_generator_filters)
 
         # Layers 4-12: Residual blocks
-        for _ in range(4, 4 + self.generator_residual_layers):
+        for _ in range(4, 4 + self.generator_residual_blocks):
             x = self.Rk(x)
 
         # Layer 13:14: Upsampling
-        x = self.uk(x, 64)
-        x = self.uk(x, 32)
+        x = self.uk(x, 2*self.base_generator_filters)
+        x = self.uk(x, self.base_generator_filters)
 
         # Layer 15: Output
         x = ReflectionPadding3D((3, 3, 3))(x)
@@ -395,17 +414,17 @@ class CycleGAN():
                 # Save temporary images continously
                 self.save_tmp_images(real_volumes_A[0], real_volumes_B[0],
                                     synthetic_volumes_A[0], synthetic_volumes_B[0])
-                
-                
+
+
 
         # ======================================================================
         # Begin training
         # ======================================================================
         if self.save_training_vol:
-            os.makedirs(os.path.join(self.out_dir, 'train_A'))
-            os.makedirs(os.path.join(self.out_dir, 'train_B'))
-            os.makedirs(os.path.join(self.out_dir, 'test_A'))
-            os.makedirs(os.path.join(self.out_dir, 'test_B'))
+            os.makedirs(os.path.join(self.out_dir_volumes, 'train_A'))
+            os.makedirs(os.path.join(self.out_dir_volumes, 'train_B'))
+            os.makedirs(os.path.join(self.out_dir_volumes, 'test_A'))
+            os.makedirs(os.path.join(self.out_dir_volumes, 'test_B'))
 
         D_A_losses = []
         D_B_losses = []
@@ -537,8 +556,8 @@ class CycleGAN():
         #     synthetic_volume_B = np.tile(synthetic_volume_B, [1,1,1,3])
         #     reconstructed_volume_B = np.tile(reconstructed_volume_B, [1,1,1,3])
 
-        save_path_A = '{}/train_A/epoch{}.nii.gz'.format(self.out_dir, epoch)
-        save_path_B = '{}/train_B/epoch{}.nii.gz'.format(self.out_dir, epoch)
+        save_path_A = '{}/train_A/epoch{}.nii.gz'.format(self.out_dir_volumes, epoch)
+        save_path_B = '{}/train_B/epoch{}.nii.gz'.format(self.out_dir_volumes, epoch)
 
         if self.paired_data:
             real_volume_Ab = self.B_train[rand_ind_A]
@@ -594,11 +613,11 @@ class CycleGAN():
         #     synthetic_volume_B = np.tile(synthetic_volume_B, [1,1,3])
         #     reconstructed_volume_B = np.tile(reconstructed_volume_B, [1,1,3])
 
-        save_path_A = '{}/test_A/epoch{}.nii.gz'.format(self.out_dir, epoch)
-        save_path_B = '{}/test_B/epoch{}.nii.gz'.format(self.out_dir, epoch)
+        save_path_A = '{}/test_A/epoch{}.nii.gz'.format(self.out_dir_volumes, epoch)
+        save_path_B = '{}/test_B/epoch{}.nii.gz'.format(self.out_dir_volumes, epoch)
 
         if self.paired_data:
-            real_volume_Ab = self.B_test[rand_ind_A] 
+            real_volume_Ab = self.B_test[rand_ind_A]
             real_volume_Ba = self.A_test[rand_ind_B]
 
             # # Add dimensions if A and B have different number of channels
@@ -699,15 +718,10 @@ class CycleGAN():
 # Save and load
 
     def save_model(self, model, epoch):
-        # Create folder to save model architecture and weights
-        model_out_dir = os.path.join('saved_models', self.date_time)
-        if not os.path.exists(model_out_dir):
-            os.makedirs(model_out_dir)
-
-        weights_path = '{}/{}_epoch_{}.hdf5'.format(model_out_dir, model.name, epoch)
+        weights_path = '{}/{}_epoch_{}.hdf5'.format(self.out_dir_models, model.name, epoch)
         model.save_weights(weights_path)
-        
-        model_path = '{}/{}_epoch_{}.json'.format(model_out_dir, model.name, epoch)
+
+        model_path = '{}/{}_epoch_{}.json'.format(self.out_dir_models, model.name, epoch)
         model_json_string = model.to_json()
         with open(model_path, 'w') as outfile:
             outfile.write(model_json_string)
@@ -715,16 +729,14 @@ class CycleGAN():
 
     def write_loss_data_to_file(self, history):
         keys = sorted(history.keys())
-        with open('volumes/{}/loss_output.csv'.format(self.date_time), 'w') as csv_file:
+        with open('runs/{}/loss_output.csv'.format(self.date_time), 'w') as csv_file:
             writer = csv.writer(csv_file, delimiter=',')
             writer.writerow(keys)
             writer.writerows(zip(*[history[key] for key in keys]))
 
     def write_metadata_to_JSON(self):
-        # Save meta_data
-        data = {}
-        data['meta_data'] = []
-        data['meta_data'].append({
+        # Save metadata
+        metadata = {
             'vol shape_A: height,width,depth,channels': self.vol_shape_A,
             'vol shape_B: height,width,depth,channels': self.vol_shape_B,
             'batch size': self.batch_size,
@@ -750,10 +762,12 @@ class CycleGAN():
             'number of B test examples': len(self.B_test),
             'discriminator sigmoid': self.discriminator_sigmoid,
             'resize convolution': self.use_resize_convolution,
-        })
+            'tag': self.tag,
+            'volume_folder': self.volume_folder
+        }
 
-        with open('{}/meta_data.json'.format(self.out_dir), 'w') as outfile:
-            json.dump(data, outfile, sort_keys=True)
+        with open('{}/metadata.json'.format(self.out_dir), 'w') as outfile:
+            json.dump(metadata, outfile, sort_keys=True)
 
 # reflection padding taken from
 # https://github.com/fastai/courses/blob/master/deeplearning2/neural-style.ipynb
@@ -769,7 +783,7 @@ class ReflectionPadding3D(Layer):
     def call(self, x, mask=None):
         w_pad, h_pad, d_pad = self.padding
         return tf.pad(x, [[0, 0], [h_pad, h_pad], [w_pad, w_pad], [d_pad, d_pad], [0, 0]], 'REFLECT')
-        
+
     def get_config(self):
         config = {'padding': self.padding}
         base_config = super(ReflectionPadding3D, self).get_config()
@@ -827,9 +841,17 @@ if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('dataset', help='name of the dataset on which to run CycleGAN (stored in data/)')
-    parser.add_argument('-g', '--gpu', type=int, default=0, help='ID of GPU on which to run')
-    parser.add_argument('-b', '--batch', type=int, default=5, help='batch size to use during training')
-    args = parser.parse_args()
-    
-    CycleGAN(args)
 
+    parser.add_argument('-r', '--resBlocks', type=int, default=9, help='number of residual blocks used in the generators (default: 9)')
+    parser.add_argument('-df', '--baseDiscFilts', type=int, default=64, help='number of filters in the first discriminator layer (default: 64)')
+    parser.add_argument('-gf', '--baseGenFilts', type=int, default=32, help='number of filters in the first generator layer (default: 32)')
+    parser.add_argument('-b', '--batch', type=int, default=5, help='batch size to use during training (default: 5)')
+
+    parser.add_argument('-g', '--gpu', type=int, default=0, help='ID of GPU on which to run (default: 0)')
+    # parser.add_argument('-t', '--tag', help='tag to remember specific settings for each training session (default: generate automatically)')
+    parser.add_argument('-t', '--tag', action='store_true', help='tag to remember specific settings for each training session (default: no tag)')
+    parser.add_argument('-x', '--extra_tag', default='', help='user-defined additional tag (default: no tag)')
+
+    args = parser.parse_args()
+
+    CycleGAN(args)

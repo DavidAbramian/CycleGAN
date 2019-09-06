@@ -66,7 +66,7 @@ def load_data_3D(subfolder=''):
             "testA_volumes": np.clip(testA_volumes/normConstant - 1, -1, 1),
             "testB_volumes": np.clip(testB_volumes/normConstant - 1, -1, 1)}
 
-def load_test_data(subfolder=''):
+def load_test_data_3D(subfolder=''):
 
     dataset_path = os.path.join('data', subfolder)
     if not os.path.isdir(dataset_path):
@@ -89,7 +89,7 @@ def load_test_data(subfolder=''):
     testA_volume_names = [os.path.basename(x) for x in testA_volume_names]
     testB_volume_names = [os.path.basename(x) for x in testB_volume_names]
 
-    # Examine one volume to get size and number of channels
+    # Examine one volume to get size, number of channels, and header
     vol_test_A = nib.load(os.path.join(trainA_path, trainA_volume_names[0]))
     vol_test_B = nib.load(os.path.join(trainB_path, trainB_volume_names[0]))    
 
@@ -107,6 +107,9 @@ def load_test_data(subfolder=''):
         volume_size_B = vol_test_B.shape[0:-1]
         nr_of_channels_B = vol_test_B.shape[-1]
 
+    header_A = vol_test_A.get_header()
+    header_B = vol_test_B.get_header()
+
     trainA_volumes = create_volume_array(trainA_volume_names, trainA_path, volume_size_A, nr_of_channels_A)
     trainB_volumes = create_volume_array(trainB_volume_names, trainB_path, volume_size_B, nr_of_channels_B)
     testA_volumes = create_volume_array(testA_volume_names, testA_path, volume_size_A, nr_of_channels_A)
@@ -120,6 +123,7 @@ def load_test_data(subfolder=''):
     
     return {"volume_size_A": volume_size_A, "nr_of_channels_A": nr_of_channels_A,
             "volume_size_B": volume_size_B, "nr_of_channels_B": nr_of_channels_B,
+            "header_A": header_A, "header_B": header_B,
             "testA_volumes": np.clip(testA_volumes/normConstant - 1, -1, 1),
             "testB_volumes": np.clip(testB_volumes/normConstant - 1, -1, 1),
             "testA_volume_names": testA_volume_names,

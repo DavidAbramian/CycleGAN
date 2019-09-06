@@ -12,35 +12,39 @@ import nibabel as nib
 from progress.bar import Bar
 import numpy as np
 import glob
+import json
 import sys
 import os
 
 import keras.backend as K
 import tensorflow as tf
 
-from loadData_3D import load_test_data
+from loadData_3D import load_test_data_3D
 
 os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
 
 # np.random.seed(seed=12345)
 
 class CycleGAN():
-    def __init__(self, model_subfolder):
+    def __init__(self, args):
 
         # Parse input arguments
         os.environ["CUDA_VISIBLE_DEVICES"]=str(args.gpu)  # Select GPU device
 
         self.model_subfolder = os.path.split(args.model.rstrip('/'))[-1]
-        self.model_path = os.path.join('saved_models', self.model_subfolder)
+        self.model_path = os.path.join('runs', self.model_subfolder, 'models')
         if not os.path.isdir(self.model_path):
             sys.exit(' Model ' + self.model_subfolder + ' does not exist')
 
         if args.data:  # If data folder is provided, use it
-            data_folder = args.data = os.path.split(args.data.rstrip('/'))[-1]
-            self.out_dir = os.path.join('generated_volumes', self.model_subfolder + '_data_' + data_folder)
-        else:  # If data folder is not provided, guess from model name
-            data_folder = self.model_subfolder[16:]
-            self.out_dir = os.path.join('generated_volumes', self.model_subfolder)
+            data_folder = os.path.split(args.data.rstrip('/'))[-1]
+        else:  # If data folder is not provided, read from metadata
+            with open(os.path.join('runs', self.model_subfolder, 'metadata.json'), 'r') as metadata_json:
+                metadata = json.load(metadata_json)
+                
+            data_folder = metadata["volume_folder"]
+        
+        self.out_dir = os.path.join('runs', self.model_subfolder, 'synthetic_volumes', data_folder)
 
         if args.epochs:  # If epochs are provided, make a list
             try:
@@ -64,13 +68,15 @@ class CycleGAN():
         # ======= Data ==========
         print('--- Caching data ---')
 
-        data = load_test_data(subfolder=data_folder)
+        data = load_test_data_3D(subfolder=data_folder)
 
         self.channels_A = data["nr_of_channels_A"]
         self.vol_shape_A = data["volume_size_A"] + (self.channels_A,)
+        self.header_A = data["header_A"]
 
         self.channels_B = data["nr_of_channels_B"]
         self.vol_shape_B = data["volume_size_B"] + (self.channels_B,)
+        self.header_B = data["header_B"]
 
         print('Volume A shape: ', self.vol_shape_A)
         print('Volume B shape: ', self.vol_shape_B)
@@ -103,9 +109,9 @@ class CycleGAN():
         model.load_weights(path_to_weights)
         return model
 
-    def save_volume(self, volume, save_path):
+    def save_volume(self, volume, header, save_path):
         volume = (volume + 1) * self.norm_const  # Undo normalization
-        img = nib.Nifti1Image(volume.astype("float32"), np.eye(4))
+        img = nib.Nifti1Image(volume.astype("float32"), None, header)
         nib.save(img, save_path)
 
         # if image.shape[2] == 1:
@@ -150,7 +156,7 @@ class CycleGAN():
                     out_name = self.testA_volume_names[i][:-7] + '_synthetic.nii.gz'
                     save_path = os.path.join(out_dir, out_name)
                     
-                    self.save_volume(synt_B, save_path)
+                    self.save_volume(synt_B, self.header_B, save_path)
                     bar.next()
                 bar.finish()
 
@@ -186,7 +192,7 @@ class CycleGAN():
                     out_name = self.testB_volume_names[i][:-7] + '_synthetic.nii.gz'
                     save_path = os.path.join(out_dir, out_name)
                     
-                    self.save_volume(synt_A, save_path)
+                    self.save_volume(synt_A, self.header_A, save_path)
                     bar.next()
                 bar.finish()
 
