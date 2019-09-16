@@ -71,6 +71,7 @@ class CycleGAN():
         self.epochs = 200  # choose multiples of 20 since the models are saved each 20th epoch
 
         self.save_models = True  # Save or not the generator and discriminator models
+        self.save_models_inteval = 20  # Number of epoch between saves of generator and discriminator models
         self.save_training_img = True  # Save or not example training results or only tmp.png
         self.save_training_img_interval = 1  # Number of epoch between saves of intermediate training results
         self.tmp_img_update_frequency = 3  # Number of batches between updates of tmp.png
@@ -165,7 +166,7 @@ class CycleGAN():
         self.out_dir = os.path.join('runs', self.date_time)
         if not os.path.exists(self.out_dir):
             os.makedirs(self.out_dir)
-        
+
         if self.save_training_img:
             self.out_dir_images = os.path.join(self.out_dir, 'training_images')
             if not os.path.exists(self.out_dir_images):
@@ -459,7 +460,7 @@ class CycleGAN():
                 self.save_epoch_images(epoch)
 
             # Save model
-            if self.save_models and epoch % 20 == 0:
+            if self.save_models and epoch % self.save_models_inteval == 0:
                 self.save_model(self.D_A, epoch)
                 self.save_model(self.D_B, epoch)
                 self.save_model(self.G_A2B, epoch)
