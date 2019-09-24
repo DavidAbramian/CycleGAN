@@ -31,20 +31,20 @@ class CycleGAN():
         # Parse input arguments
         os.environ["CUDA_VISIBLE_DEVICES"]=str(args.gpu)  # Select GPU device
 
-        self.model_subfolder = os.path.split(args.model.rstrip('/'))[-1]
-        self.model_path = os.path.join('runs', self.model_subfolder, 'models')
+        self.run_subfolder = os.path.split(args.run.rstrip('/'))[-1]
+        self.model_path = os.path.join('runs', self.run_subfolder, 'models')
         if not os.path.isdir(self.model_path):
-            sys.exit(' Model ' + self.model_subfolder + ' does not exist')
+            sys.exit(' Model ' + self.run_subfolder + ' does not exist')
 
         if args.data:  # If data folder is provided, use it
             image_folder = os.path.split(args.data.rstrip('/'))[-1]
         else:  # If data folder is not provided, read from metadata
-            with open(os.path.join('runs', self.model_subfolder, 'metadata.json'), 'r') as metadata_json:
+            with open(os.path.join('runs', self.run_subfolder, 'metadata.json'), 'r') as metadata_json:
                 metadata = json.load(metadata_json)
                 
             image_folder = metadata["image_folder"]
 
-        self.out_dir = os.path.join('runs', self.model_subfolder, 'synthetic_images', image_folder)
+        self.out_dir = os.path.join('runs', self.run_subfolder, 'synthetic_images', image_folder)
 
         if args.epochs:  # If epochs are provided, make a list
             try:
@@ -197,7 +197,15 @@ class ReflectionPadding2D(Layer):
         super(ReflectionPadding2D, self).__init__(**kwargs)
 
     def compute_output_shape(self, s):
-        return (s[0], s[1] + 2 * self.padding[0], s[2] + 2 * self.padding[1], s[3])
+        size_increase = [0, 2*self.padding[0], 2*self.padding[1], 0]
+        output_shape = list(s)
+        
+        for i in range(len(s)):
+            if output_shape[i] == None:
+                continue
+            output_shape[i] += size_increase[i]
+                    
+        return tuple(output_shape)
 
     def call(self, x, mask=None):
         w_pad, h_pad = self.padding
@@ -208,8 +216,8 @@ if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('model', help='name of the model on which to run CycleGAN, stored in saved_models/')
-    parser.add_argument('-d', '--data', help='dataset on which to apply the model, stored in data/ (default: guessed from the model name)')
+    parser.add_argument('run', help='CycleGAN run from which to take the model, stored in runs/')
+    parser.add_argument('-d', '--data', help='dataset on which to apply the model, stored in data/ (default: same as the model was trained on)')
     parser.add_argument('-e', '--epochs', help='comma-separated list of model epochs to use (default: all available)')
     
     parser.add_argument('-g', '--gpu', type=int, default=0, help='ID of GPU on which to run (default: 0)')

@@ -33,6 +33,7 @@ class CycleGAN():
         os.environ["CUDA_VISIBLE_DEVICES"]=str(args.gpu)  # Select GPU device
         self.image_folder = os.path.split(args.dataset.rstrip('/'))[-1]
         batch_size = args.batch
+        self.fixedsize = args.fixedsize
 
         # ======= Data ==========
         print('--- Caching data ---')
@@ -47,6 +48,14 @@ class CycleGAN():
 
         print('Image A shape: ', self.img_shape_A)
         print('Image B shape: ', self.img_shape_B)
+
+        if self.fixedsize:
+            self.input_shape_A = self.img_shape_A
+            self.input_shape_B = self.img_shape_B
+        else:
+            self.input_shape_A = (None, None) + (self.channels_A,)
+            self.input_shape_B = (None, None) + (self.channels_B,)
+            print('Using unspecified input size')
 
         self.A_train = data["trainA_images"]
         self.B_train = data["trainB_images"]
@@ -101,12 +110,12 @@ class CycleGAN():
         self.opt_G = Adam(self.learning_rate_G, self.beta_1, self.beta_2)
 
         # Build discriminators
-        D_A = self.build_discriminator(self.img_shape_A)
-        D_B = self.build_discriminator(self.img_shape_B)
+        D_A = self.build_discriminator(self.input_shape_A)
+        D_B = self.build_discriminator(self.input_shape_B)
 
         # Define discriminator models
-        image_A = Input(shape=self.img_shape_A)
-        image_B = Input(shape=self.img_shape_B)
+        image_A = Input(shape=self.input_shape_A)
+        image_B = Input(shape=self.input_shape_B)
         guess_A = D_A(image_A)
         guess_B = D_B(image_B)
         self.D_A = Model(inputs=image_A, outputs=guess_A, name='D_A_model')
@@ -130,12 +139,12 @@ class CycleGAN():
         self.D_B_static.trainable = False
 
         # Build generators
-        self.G_A2B = self.build_generator(self.img_shape_A, self.img_shape_B, name='G_A2B_model')
-        self.G_B2A = self.build_generator(self.img_shape_B, self.img_shape_A, name='G_B2A_model')
+        self.G_A2B = self.build_generator(self.input_shape_A, self.input_shape_B, name='G_A2B_model')
+        self.G_B2A = self.build_generator(self.input_shape_B, self.input_shape_A, name='G_B2A_model')
 
         # Define full CycleGAN model, used for training the generators
-        real_A = Input(shape=self.img_shape_A, name='real_A')
-        real_B = Input(shape=self.img_shape_B, name='real_B')
+        real_A = Input(shape=self.input_shape_A, name='real_A')
+        real_B = Input(shape=self.input_shape_B, name='real_B')
         synthetic_B = self.G_A2B(real_A)
         synthetic_A = self.G_B2A(real_B)
         dB_guess_synthetic = self.D_B_static(synthetic_B)
@@ -413,7 +422,11 @@ class CycleGAN():
         synthetic_pool_B = ImagePool(self.synthetic_pool_size)
 
         # Labels used for discriminator training
-        label_shape = (batch_size,) + self.D_A.output_shape[1:]
+        if self.fixedsize:
+            label_shape = (batch_size,) + self.D_A.output_shape[1:]
+        else:
+            label_shape = (batch_size,) + self.D_A.compute_output_shape((1,) + self.img_shape_A)[1:]
+            
         ones = np.ones(shape=label_shape) * self.REAL_LABEL
         zeros = ones * 0
 
@@ -667,6 +680,8 @@ class CycleGAN():
         metadata = {
             'img shape_A: height,width,channels': self.img_shape_A,
             'img shape_B: height,width,channels': self.img_shape_B,
+            'input shape_A: height,width,channels': self.input_shape_A,
+            'input shape_B: height,width,channels': self.input_shape_B,
             'batch size': self.batch_size,
             'save training img interval': self.save_training_img_interval,
             'normalization function': str(self.normalization),
@@ -705,7 +720,15 @@ class ReflectionPadding2D(Layer):
         super(ReflectionPadding2D, self).__init__(**kwargs)
 
     def compute_output_shape(self, s):
-        return (s[0], s[1] + 2 * self.padding[0], s[2] + 2 * self.padding[1], s[3])
+        size_increase = [0, 2*self.padding[0], 2*self.padding[1], 0]
+        output_shape = list(s)
+        
+        for i in range(len(s)):
+            if output_shape[i] == None:
+                continue
+            output_shape[i] += size_increase[i]
+                    
+        return tuple(output_shape)
 
     def call(self, x, mask=None):
         w_pad, h_pad = self.padding
@@ -768,8 +791,11 @@ if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('dataset', help='name of the dataset on which to run CycleGAN (stored in data/)')
-    parser.add_argument('-g', '--gpu', type=int, default=0, help='ID of GPU on which to run')
     parser.add_argument('-b', '--batch', type=int, default=5, help='batch size to use during training')
+    parser.add_argument('-f', '--fixedsize', action='store_true', help='use fixed input size (default: unspecified size)')
+    
+    parser.add_argument('-g', '--gpu', type=int, default=0, help='ID of GPU on which to run')
+    
     args = parser.parse_args()
 
     CycleGAN(args)
