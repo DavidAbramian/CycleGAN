@@ -187,7 +187,7 @@ class CycleGAN():
         # ===== Folders and configuration =====
         if args.tag:
             # Calculate receptive field
-            nDiscFiltsStride2 = np.log2(self.D_A.input_shape[1] / self.D_A.output_shape[1])
+            nDiscFiltsStride2 = np.log2(self.vol_shape_A[1]  / self.D_A.compute_output_shape((1,) + self.vol_shape_A)[1])
             receptField = int((16 - 3*nDiscFiltsStride2) * 2**nDiscFiltsStride2 + 2**(nDiscFiltsStride2 + 1) - 2)
 
             # Generate tag
