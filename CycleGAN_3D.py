@@ -108,6 +108,8 @@ class CycleGAN():
         self.use_resize_convolution = False  # Resize convolution - instead of transpose convolution in deconvolution layers (uk) - can reduce checkerboard artifacts but the blurring might affect the cycle-consistency
         self.discriminator_sigmoid = True
         self.generator_residual_blocks = args.resBlocks
+        self.discriminator_layers = args.discLayers
+        self.stride_2_layers = args.nStride2
         self.base_discirminator_filters = args.baseDiscFilts
         self.base_generator_filters = args.baseGenFilts
 
@@ -186,9 +188,11 @@ class CycleGAN():
 
         # ===== Folders and configuration =====
         if args.tag:
-            # Calculate receptive field
-            nDiscFiltsStride2 = np.log2(self.vol_shape_A[1]  / self.D_A.compute_output_shape((1,) + self.vol_shape_A)[1])
-            receptField = int((16 - 3*nDiscFiltsStride2) * 2**nDiscFiltsStride2 + 2**(nDiscFiltsStride2 + 1) - 2)
+            # Calculate discriminator receptive field
+            nDiscFiltsStride2 = np.clip(self.stride_2_layers, 0, self.discriminator_layers-1)
+            nDiscFiltsStride1 = self.discriminator_layers - nDiscFiltsStride2
+
+            receptField = int((1 + 3*nDiscFiltsStride1) * 2**nDiscFiltsStride2 + 2**(nDiscFiltsStride2 + 1) - 2)
 
             # Generate tag
             self.tag = '_LR_{}_RL_{}_DF_{}_GF_{}_RF_{}'.format(self.learning_rate_D, self.generator_residual_blocks, self.base_discirminator_filters, self.base_generator_filters, receptField)
@@ -296,10 +300,12 @@ class CycleGAN():
         input_vol = Input(shape=vol_shape)
 
         # Layers 1-4
-        x = self.ck(input_vol, self.base_discirminator_filters, False, True, 2) #  Instance normalization is not used for this layer)
-        x = self.ck(x, 2*self.base_discirminator_filters, True, self.use_bias, 2)
-        x = self.ck(x, 4*self.base_discirminator_filters, True, self.use_bias, 1)
-        x = self.ck(x, 8*self.base_discirminator_filters, True, self.use_bias, 1)
+        for i in range(self.discriminator_layers - 1):
+            stride = int(i < self.stride_2_layers)+1
+            if i == 0:
+                x = self.ck(input_vol, self.base_discirminator_filters, False, True, stride) #  Instance normalization is not used for this layer)
+            else:
+                x = self.ck(x, (2**(i-1)) * self.base_discirminator_filters, True, self.use_bias, stride)
 
         # Layer 5: Output
         if self.use_patchgan:
@@ -796,12 +802,12 @@ class ReflectionPadding3D(Layer):
     def compute_output_shape(self, s):
         size_increase = [0, 2*self.padding[0], 2*self.padding[1], 2*self.padding[2], 0]
         output_shape = list(s)
-        
+
         for i in range(len(s)):
             if output_shape[i] == None:
                 continue
             output_shape[i] += size_increase[i]
-                    
+
         return tuple(output_shape)
 
     def call(self, x, mask=None):
@@ -867,6 +873,8 @@ if __name__ == '__main__':
     parser.add_argument('dataset', help='name of the dataset on which to run CycleGAN (stored in data/)')
 
     parser.add_argument('-r', '--resBlocks', type=int, default=9, help='number of residual blocks used in the generators (default: 9)')
+    parser.add_argument('-dl', '--discLayers', type=int, default=5, help='number of discriminator layers to use (default: 5)')
+    parser.add_argument('-s2', '--nStride2', type=int, default=3, help='number of filters with stride 2 (default: 3)')
     parser.add_argument('-df', '--baseDiscFilts', type=int, default=64, help='number of filters in the first discriminator layer (default: 64)')
     parser.add_argument('-gf', '--baseGenFilts', type=int, default=32, help='number of filters in the first generator layer (default: 32)')
     parser.add_argument('-b', '--batch', type=int, default=5, help='batch size to use during training (default: 5)')
