@@ -198,7 +198,6 @@ class CycleGAN():
         sys.stdout.flush()
         # plot_model(self.G_A2B, to_file='GA2B_expanded_model_new.png', show_shapes=True)
         self.train(epochs=self.epochs, batch_size=self.batch_size)
-        # self.load_model_and_generate_synthetic_images()
 
 # ===============================================================================
 # Architecture functions
@@ -426,7 +425,7 @@ class CycleGAN():
             label_shape = (batch_size,) + self.D_A.output_shape[1:]
         else:
             label_shape = (batch_size,) + self.D_A.compute_output_shape((1,) + self.img_shape_A)[1:]
-            
+
         ones = np.ones(shape=label_shape) * self.REAL_LABEL
         zeros = ones * 0
 
@@ -722,12 +721,12 @@ class ReflectionPadding2D(Layer):
     def compute_output_shape(self, s):
         size_increase = [0, 2*self.padding[0], 2*self.padding[1], 0]
         output_shape = list(s)
-        
+
         for i in range(len(s)):
             if output_shape[i] == None:
                 continue
             output_shape[i] += size_increase[i]
-                    
+
         return tuple(output_shape)
 
     def call(self, x, mask=None):
@@ -793,9 +792,9 @@ if __name__ == '__main__':
     parser.add_argument('dataset', help='name of the dataset on which to run CycleGAN (stored in data/)')
     parser.add_argument('-b', '--batch', type=int, default=5, help='batch size to use during training')
     parser.add_argument('-f', '--fixedsize', action='store_true', help='use fixed input size (default: unspecified size)')
-    
+
     parser.add_argument('-g', '--gpu', type=int, default=0, help='ID of GPU on which to run')
-    
+
     args = parser.parse_args()
 
     CycleGAN(args)

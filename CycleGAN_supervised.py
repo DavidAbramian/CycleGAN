@@ -31,13 +31,14 @@ class CycleGAN():
 
         # Parse input arguments
         os.environ["CUDA_VISIBLE_DEVICES"]=str(args.gpu)  # Select GPU device
-        image_folder = os.path.split(args.dataset.rstrip('/'))[-1]
+        self.image_folder = os.path.split(args.dataset.rstrip('/'))[-1]
         batch_size = args.batch
+        self.fixedsize = args.fixedsize
 
         # ======= Data ==========
         print('--- Caching data ---')
 
-        data = load_data(subfolder=image_folder)
+        data = load_data(subfolder=self.image_folder)
 
         self.channels_A = data["nr_of_channels_A"]
         self.img_shape_A = data["image_size_A"] + (self.channels_A,)
@@ -47,6 +48,14 @@ class CycleGAN():
 
         print('Image A shape: ', self.img_shape_A)
         print('Image B shape: ', self.img_shape_B)
+
+        if self.fixedsize:
+            self.input_shape_A = self.img_shape_A
+            self.input_shape_B = self.img_shape_B
+        else:
+            self.input_shape_A = (None, None) + (self.channels_A,)
+            self.input_shape_B = (None, None) + (self.channels_B,)
+            print('Using unspecified input size')
 
         self.A_train = data["trainA_images"]
         self.B_train = data["trainB_images"]
@@ -66,9 +75,9 @@ class CycleGAN():
         self.beta_2 = 0.999  # Adam parameter
         self.batch_size = batch_size  # Number of images per batch
         self.epochs = 200  # choose multiples of 20 since the models are saved each 20th epoch
-        # self.epochs = 1000  # choose multiples of 20 since the models are saved each 20th epoch
 
         self.save_models = True  # Save or not the generator and discriminator models
+        self.save_models_inteval = 20  # Number of epoch between saves of generator and discriminator models
         self.save_training_img = True  # Save or not example training results or only tmp.png
         self.save_training_img_interval = 1  # Number of epoch between saves of intermediate training results
         self.tmp_img_update_frequency = 3  # Number of batches between updates of tmp.png
@@ -79,7 +88,6 @@ class CycleGAN():
         self.use_bias = True  # Use bias
         self.use_linear_decay = True  # Linear decay of learning rate, for both discriminators and generators
         self.decay_epoch = 101  # The epoch where the linear decay of the learning rates start
-        # self.decay_epoch = 501  # The epoch where the linear decay of the learning rates start
         self.use_patchgan = True  # PatchGAN - if false the discriminator learning rate should be decreased
         self.use_resize_convolution = False  # Resize convolution - instead of transpose convolution in deconvolution layers (uk) - can reduce checkerboard artifacts but the blurring might affect the cycle-consistency
         self.discriminator_sigmoid = True
@@ -99,10 +107,10 @@ class CycleGAN():
         self.opt_G = Adam(self.learning_rate_G, self.beta_1, self.beta_2)
 
         # Build discriminators
-        D_B = self.build_discriminator(self.img_shape_B)
+        D_B = self.build_discriminator(self.input_shape_B)
 
         # Define discriminator models
-        image_B = Input(shape=self.img_shape_B)
+        image_B = Input(shape=self.input_shape_B)
         guess_B = D_B(image_B)
         self.D_B = Model(inputs=image_B, outputs=guess_B, name='D_B_model')
 
@@ -119,10 +127,10 @@ class CycleGAN():
         self.D_B_static.trainable = False
 
         # Build generators
-        self.G_A2B = self.build_generator(self.img_shape_A, self.img_shape_B, name='G_A2B_model')
+        self.G_A2B = self.build_generator(self.input_shape_A, self.input_shape_B, name='G_A2B_model')
 
         # Define full CycleGAN model, used for training the generators
-        real_A = Input(shape=self.img_shape_A, name='real_A')
+        real_A = Input(shape=self.input_shape_A, name='real_A')
         synthetic_B = self.G_A2B(real_A)
         dB_guess_synthetic = self.D_B_static(synthetic_B)
 
@@ -140,18 +148,23 @@ class CycleGAN():
                              loss_weights=compile_weights)
 
         # ===== Folders and configuration =====
-        self.date_time = time.strftime('%Y%m%d-%H%M%S', time.localtime()) + '-' + image_folder
+        self.date_time = time.strftime('%Y%m%d-%H%M%S', time.localtime()) + '-' + self.image_folder
 
         # Output folder for run data and images
-        self.out_dir = os.path.join('images', self.date_time)
+        self.out_dir = os.path.join('runs', self.date_time)
         if not os.path.exists(self.out_dir):
             os.makedirs(self.out_dir)
 
+        if self.save_training_img:
+            self.out_dir_images = os.path.join(self.out_dir, 'training_images')
+            if not os.path.exists(self.out_dir_images):
+                os.makedirs(self.out_dir_images)
+
         # Output folder for saved models
         if self.save_models:
-            self.model_out_dir = os.path.join('saved_models', self.date_time)
-            if not os.path.exists(self.model_out_dir):
-                os.makedirs(self.model_out_dir)
+            self.out_dir_models = os.path.join(self.out_dir, 'models')
+            if not os.path.exists(self.out_dir_models):
+                os.makedirs(self.out_dir_models)
 
         self.write_metadata_to_JSON()
 
@@ -164,7 +177,6 @@ class CycleGAN():
         sys.stdout.flush()
         # plot_model(self.G_A2B, to_file='GA2B_expanded_model_new.png', show_shapes=True)
         self.train(epochs=self.epochs, batch_size=self.batch_size)
-        # self.load_model_and_generate_synthetic_images()
 
 # ===============================================================================
 # Architecture functions
@@ -349,8 +361,8 @@ class CycleGAN():
         # Begin training
         # ======================================================================
         if self.save_training_img:
-            os.makedirs(os.path.join(self.out_dir, 'train_A'))
-            os.makedirs(os.path.join(self.out_dir, 'test_A'))
+            os.makedirs(os.path.join(self.out_dir_images, 'train_A'))
+            os.makedirs(os.path.join(self.out_dir_images, 'test_A'))
 
         D_B_losses = []
 
@@ -362,7 +374,11 @@ class CycleGAN():
         synthetic_pool_B = ImagePool(self.synthetic_pool_size)
 
         # Labels used for discriminator training
-        label_shape = (batch_size,) + self.D_B.output_shape[1:]
+        if self.fixedsize:
+            label_shape = (batch_size,) + self.D_B.output_shape[1:]
+        else:
+            label_shape = (batch_size,) + self.D_B.compute_output_shape((1,) + self.img_shape_B)[1:]
+
         ones = np.ones(shape=label_shape) * self.REAL_LABEL
         zeros = ones * 0
 
@@ -379,7 +395,8 @@ class CycleGAN():
 
         for epoch in range(1, epochs + 1):
 
-            random_order = np.random.permutation(nr_train_im)
+            random_order = np.concatenate((np.random.permutation(nr_train_im),
+                                             np.random.randint(nr_train_im, size=nr_im_per_epoch - nr_train_im)))
 
             # Train on image batch
             for loop_index in range(0, nr_im_per_epoch, batch_size):
@@ -402,7 +419,7 @@ class CycleGAN():
                 self.save_epoch_images(epoch)
 
             # Save model
-            if self.save_models and epoch % 20 == 0:
+            if self.save_models and epoch % self.save_models_inteval == 0:
                 self.save_model(self.D_B, epoch)
                 self.save_model(self.G_A2B, epoch)
 
@@ -454,7 +471,7 @@ class CycleGAN():
             synthetic_image_B = np.tile(synthetic_image_B, [1,1,3])
             real_image_B = np.tile(real_image_B, [1,1,3])
 
-        save_path = '{}/train_A/epoch{}.png'.format(self.out_dir, epoch)
+        save_path = '{}/train_A/epoch{}.png'.format(self.out_dir_images, epoch)
 
         self.join_and_save((real_image_A, synthetic_image_B, real_image_B), save_path)
 
@@ -470,7 +487,7 @@ class CycleGAN():
             synthetic_image_B = np.tile(synthetic_image_B, [1,1,3])
             real_image_B = np.tile(real_image_B, [1,1,3])
 
-        save_path = '{}/test_A/epoch{}.png'.format(self.out_dir, epoch)
+        save_path = '{}/test_A/epoch{}.png'.format(self.out_dir_images, epoch)
 
         self.join_and_save((real_image_A, synthetic_image_B, real_image_B), save_path)
 
@@ -528,15 +545,10 @@ class CycleGAN():
 # Save and load
 
     def save_model(self, model, epoch):
-        # Create folder to save model architecture and weights
-        model_out_dir = os.path.join('saved_models', self.date_time)
-        if not os.path.exists(model_out_dir):
-            os.makedirs(model_out_dir)
-
-        weights_path = '{}/{}_epoch_{}.hdf5'.format(model_out_dir, model.name, epoch)
+        weights_path = '{}/{}_epoch_{}.hdf5'.format(self.out_dir_models, model.name, epoch)
         model.save_weights(weights_path)
-        
-        model_path = '{}/{}_epoch_{}.json'.format(model_out_dir, model.name, epoch)
+
+        model_path = '{}/{}_epoch_{}.json'.format(self.out_dir_models, model.name, epoch)
         model_json_string = model.to_json()
         with open(model_path, 'w') as outfile:
             outfile.write(model_json_string)
@@ -544,18 +556,18 @@ class CycleGAN():
 
     def write_loss_data_to_file(self, history):
         keys = sorted(history.keys())
-        with open('images/{}/loss_output.csv'.format(self.date_time), 'w') as csv_file:
+        with open('runs/{}/loss_output.csv'.format(self.date_time), 'w') as csv_file:
             writer = csv.writer(csv_file, delimiter=',')
             writer.writerow(keys)
             writer.writerows(zip(*[history[key] for key in keys]))
 
     def write_metadata_to_JSON(self):
-        # Save meta_data
-        data = {}
-        data['meta_data'] = []
-        data['meta_data'].append({
+        # Save metadata
+        metadata = {
             'img shape_A: height,width,channels': self.img_shape_A,
             'img shape_B: height,width,channels': self.img_shape_B,
+            'input shape_A: height,width,channels': self.input_shape_A,
+            'input shape_B: height,width,channels': self.input_shape_B,
             'batch size': self.batch_size,
             'save training img interval': self.save_training_img_interval,
             'normalization function': str(self.normalization),
@@ -578,10 +590,11 @@ class CycleGAN():
             'number of B test examples': len(self.B_test),
             'discriminator sigmoid': self.discriminator_sigmoid,
             'resize convolution': self.use_resize_convolution,
-        })
+            'image_folder': self.image_folder
+        }
 
-        with open('{}/meta_data.json'.format(self.out_dir), 'w') as outfile:
-            json.dump(data, outfile, sort_keys=True)
+        with open('{}/metadata.json'.format(self.out_dir), 'w') as outfile:
+            json.dump(metadata, outfile, sort_keys=True)
 
 # reflection padding taken from
 # https://github.com/fastai/courses/blob/master/deeplearning2/neural-style.ipynb
@@ -592,7 +605,15 @@ class ReflectionPadding2D(Layer):
         super(ReflectionPadding2D, self).__init__(**kwargs)
 
     def compute_output_shape(self, s):
-        return (s[0], s[1] + 2 * self.padding[0], s[2] + 2 * self.padding[1], s[3])
+        size_increase = [0, 2*self.padding[0], 2*self.padding[1], 0]
+        output_shape = list(s)
+
+        for i in range(len(s)):
+            if output_shape[i] == None:
+                continue
+            output_shape[i] += size_increase[i]
+
+        return tuple(output_shape)
 
     def call(self, x, mask=None):
         w_pad, h_pad = self.padding
@@ -655,8 +676,11 @@ if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('dataset', help='name of the dataset on which to run CycleGAN (stored in data/)')
-    parser.add_argument('-g', '--gpu', type=int, default=0, help='ID of GPU on which to run')
     parser.add_argument('-b', '--batch', type=int, default=5, help='batch size to use during training')
+    parser.add_argument('-f', '--fixedsize', action='store_true', help='use fixed input size (default: unspecified size)')
+
+    parser.add_argument('-g', '--gpu', type=int, default=0, help='ID of GPU on which to run')
+
     args = parser.parse_args()
-    
+
     CycleGAN(args)
