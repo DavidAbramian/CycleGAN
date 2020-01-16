@@ -73,7 +73,7 @@ class CycleGAN():
         self.A_test = data["testA_volumes"]
         self.B_test = data["testB_volumes"]
 
-        self.paired_data = False
+        self.paired_data = True
 
         # ===== Model parameters ======
         # Training parameters
@@ -222,7 +222,7 @@ class CycleGAN():
 
         self.write_metadata_to_JSON()
 
-        # Don't pre-allocate GPU memory; allocate as-needed
+        # Don't pre-allocate GPU memory; allocate as needed
         config = tf.ConfigProto()
         config.gpu_options.allow_growth = True
         K.tensorflow_backend.set_session(tf.Session(config=config))
@@ -346,6 +346,7 @@ class CycleGAN():
 
 #===============================================================================
 # Training
+
     def train(self, epochs, batch_size=1):
 
         def run_training_batch():
@@ -430,8 +431,6 @@ class CycleGAN():
                 # Save temporary images continously
                 self.save_tmp_images(real_volumes_A[0], real_volumes_B[0],
                                     synthetic_volumes_A[0], synthetic_volumes_B[0])
-
-
 
         # ======================================================================
         # Begin training
@@ -529,7 +528,7 @@ class CycleGAN():
             self.write_loss_data_to_file(training_history)
 
 #===============================================================================
-# Help functions
+# Loss functions
 
     def lse(self, y_true, y_pred):
         loss = tf.reduce_mean(tf.squared_difference(y_pred, y_true))
@@ -539,284 +538,8 @@ class CycleGAN():
         loss = tf.reduce_mean(tf.abs(y_pred - y_true))
         return loss
 
-    def join_and_save(self, images, save_path):
-        # Join images
-        image = np.hstack(images)
-        print(image.shape)
-
-        # Save images
-        if image.shape[2] == 1:
-            image = image[:, :, 0]
-            mpimage.imsave(save_path, image, vmin=-1, vmax=1, cmap='gray')
-        else:
-            image = (image+1) / 2
-            mpimage.imsave(save_path, image)
-
-    def save_epoch_volumes(self, epoch, num_saved_volumes=1):
-        # Save training volumes
-        nr_train_vol_A = self.A_train.shape[0]
-        nr_train_vol_B = self.B_train.shape[0]
-
-        rand_ind_A = np.random.randint(nr_train_vol_A)
-        rand_ind_B = np.random.randint(nr_train_vol_B)
-
-        real_volume_A = self.A_train[rand_ind_A]
-        real_volume_B = self.B_train[rand_ind_B]
-        synthetic_volume_B = self.G_A2B.predict(real_volume_A[np.newaxis])[0]
-        synthetic_volume_A = self.G_B2A.predict(real_volume_B[np.newaxis])[0]
-        reconstructed_volume_A = self.G_B2A.predict(synthetic_volume_B[np.newaxis])[0]
-        reconstructed_volume_B = self.G_A2B.predict(synthetic_volume_A[np.newaxis])[0]
-
-        # # Add dimensions if A and B have different number of channels
-        # if self.channels_A == 1 and self.channels_B == 3:
-        #     real_volume_A = np.tile(real_volume_A, [1,1,1,3])
-        #     synthetic_volume_A = np.tile(synthetic_volume_A, [1,1,1,3])
-        #     reconstructed_volume_A = np.tile(reconstructed_volume_A, [1,1,1,3])
-        # elif self.channels_B == 1 and self.channels_A == 3:
-        #     real_volume_B = np.tile(real_volume_B, [1,1,1,3])
-        #     synthetic_volume_B = np.tile(synthetic_volume_B, [1,1,1,3])
-        #     reconstructed_volume_B = np.tile(reconstructed_volume_B, [1,1,1,3])
-
-        save_path_A = '{}/train_A/epoch{}.nii.gz'.format(self.out_dir_volumes, epoch)
-        save_path_B = '{}/train_B/epoch{}.nii.gz'.format(self.out_dir_volumes, epoch)
-
-        if self.paired_data:
-            real_volume_Ab = self.B_train[rand_ind_A]
-            real_volume_Ba = self.A_train[rand_ind_B]
-
-            # # Add dimensions if A and B have different number of channels
-            # if self.channels_A == 1 and self.channels_B == 3:
-            #    real_volume_Ba = np.tile(real_volume_Ba, [1,1,1,3])
-            # elif self.channels_B == 1 and self.channels_A == 3:
-            #    real_volume_Ab = np.tile(real_volume_Ab, [1,1,1,3])
-
-            image_A = np.hstack((real_volume_Ab, real_volume_A, synthetic_volume_B, reconstructed_volume_A))
-
-            img = nib.Nifti1Image(image_A.astype("float32"), np.eye(4))
-            nib.save(img, save_path_A)
-
-            image_B = np.hstack((real_volume_Ba, real_volume_B, synthetic_volume_A, reconstructed_volume_B))
-
-            img = nib.Nifti1Image(image_B.astype("float32"), np.eye(4))
-            nib.save(img, save_path_B)
-        else:
-            if self.channels_A == self.channels_B:
-                image_A = np.hstack((real_volume_A, synthetic_volume_B, reconstructed_volume_A))
-
-                img = nib.Nifti1Image(image_A.astype("float32"), np.eye(4))
-                nib.save(img, save_path_A)
-
-                image_B = np.hstack((real_volume_B, synthetic_volume_A, reconstructed_volume_B))
-
-                img = nib.Nifti1Image(image_B.astype("float32"), np.eye(4))
-                nib.save(img, save_path_B)
-            else:
-                save_path_realA = '{}/train_A/epoch{}_real.nii.gz'.format(self.out_dir_volumes, epoch)
-                save_path_realB = '{}/train_B/epoch{}_real.nii.gz'.format(self.out_dir_volumes, epoch)
-
-                save_path_reconstructedA = '{}/train_A/epoch{}_reconstructed.nii.gz'.format(self.out_dir_volumes, epoch)
-                save_path_reconstructedB = '{}/train_B/epoch{}_reconstructed.nii.gz'.format(self.out_dir_volumes, epoch)
-
-                save_path_syntheticA = '{}/train_A/epoch{}_synthetic.nii.gz'.format(self.out_dir_volumes, epoch)
-                save_path_syntheticB = '{}/train_B/epoch{}_synthetic.nii.gz'.format(self.out_dir_volumes, epoch)
-
-                img = nib.Nifti1Image(real_volume_A.astype("float32"), np.eye(4)) 
-                nib.save(img, save_path_realA)
-                img = nib.Nifti1Image(real_volume_B.astype("float32"), np.eye(4)) 
-                nib.save(img, save_path_realB)
-
-                img = nib.Nifti1Image(reconstructed_volume_A.astype("float32"), np.eye(4)) 
-                nib.save(img, save_path_reconstructedA)
-                img = nib.Nifti1Image(reconstructed_volume_B.astype("float32"), np.eye(4)) 
-                nib.save(img, save_path_reconstructedB)
-
-                img = nib.Nifti1Image(synthetic_volume_A.astype("float32"), np.eye(4)) 
-                nib.save(img, save_path_syntheticB)
-                img = nib.Nifti1Image(synthetic_volume_B.astype("float32"), np.eye(4)) 
-                nib.save(img, save_path_syntheticA)
-
-
-        # Save test volumes
-        nr_test_vol_A = self.A_test.shape[0]
-        nr_test_vol_B = self.B_test.shape[0]
-
-        rand_ind_A = np.random.randint(nr_test_vol_A)
-        rand_ind_B = np.random.randint(nr_test_vol_B)
-
-        real_volume_A = self.A_test[rand_ind_A]
-        real_volume_B = self.B_test[rand_ind_B]
-        synthetic_volume_B = self.G_A2B.predict(real_volume_A[np.newaxis])[0]
-        synthetic_volume_A = self.G_B2A.predict(real_volume_B[np.newaxis])[0]
-        reconstructed_volume_A = self.G_B2A.predict(synthetic_volume_B[np.newaxis])[0]
-        reconstructed_volume_B = self.G_A2B.predict(synthetic_volume_A[np.newaxis])[0]
-
-        # # Add dimensions if A and B have different number of channels
-        # if self.channels_A == 1 and self.channels_B == 3:
-        #     real_volume_A = np.tile(real_volume_A, [1,1,3])
-        #     synthetic_volume_A = np.tile(synthetic_volume_A, [1,1,3])
-        #     reconstructed_volume_A = np.tile(reconstructed_volume_A, [1,1,3])
-        # elif self.channels_B == 1 and self.channels_A == 3:
-        #     real_volume_B = np.tile(real_volume_B, [1,1,3])
-        #     synthetic_volume_B = np.tile(synthetic_volume_B, [1,1,3])
-        #     reconstructed_volume_B = np.tile(reconstructed_volume_B, [1,1,3])
-
-        save_path_A = '{}/test_A/epoch{}.nii.gz'.format(self.out_dir_volumes, epoch)
-        save_path_B = '{}/test_B/epoch{}.nii.gz'.format(self.out_dir_volumes, epoch)
-
-        if self.paired_data:
-            real_volume_Ab = self.B_test[rand_ind_A]
-            real_volume_Ba = self.A_test[rand_ind_B]
-
-            # # Add dimensions if A and B have different number of channels
-            # if self.channels_A == 1 and self.channels_B == 3:
-            #     real_volume_Ba = np.tile(real_volume_Ba, [1,1,1,3])
-            # elif self.channels_B == 1 and self.channels_A == 3:
-            #     real_volume_Ab = np.tile(real_volume_Ab, [1,1,1,3])
-
-            image_A = np.hstack((real_volume_Ab, real_volume_A, synthetic_volume_B, reconstructed_volume_A))
-
-            img = nib.Nifti1Image(image_A.astype("float32"), np.eye(4))
-            nib.save(img, save_path_A)
-
-            image_B = np.hstack((real_volume_Ba, real_volume_B, synthetic_volume_A, reconstructed_volume_B))
-
-            img = nib.Nifti1Image(image_B.astype("float32"), np.eye(4))
-            nib.save(img, save_path_B)
-        else:
-            if self.channels_A == self.channels_B:
-                image_A = np.hstack((real_volume_A, synthetic_volume_B, reconstructed_volume_A))
-
-                img = nib.Nifti1Image(image_A.astype("float32"), np.eye(4))
-                nib.save(img, save_path_A)
-
-                image_B = np.hstack((real_volume_B, synthetic_volume_A, reconstructed_volume_B))
-
-                img = nib.Nifti1Image(image_B.astype("float32"), np.eye(4))
-                nib.save(img, save_path_B)
-            else:
-                save_path_realA = '{}/test_A/epoch{}_real.nii.gz'.format(self.out_dir_volumes, epoch)
-                save_path_realB = '{}/test_B/epoch{}_real.nii.gz'.format(self.out_dir_volumes, epoch)
-
-                save_path_reconstructedA = '{}/test_A/epoch{}_reconstructed.nii.gz'.format(self.out_dir_volumes, epoch)
-                save_path_reconstructedB = '{}/test_B/epoch{}_reconstructed.nii.gz'.format(self.out_dir_volumes, epoch)
-
-                save_path_syntheticA = '{}/test_A/epoch{}_synthetic.nii.gz'.format(self.out_dir_volumes, epoch)
-                save_path_syntheticB = '{}/test_B/epoch{}_synthetic.nii.gz'.format(self.out_dir_volumes, epoch)
-
-                img = nib.Nifti1Image(real_volume_A.astype("float32"), np.eye(4)) 
-                nib.save(img, save_path_realA)
-                img = nib.Nifti1Image(real_volume_B.astype("float32"), np.eye(4)) 
-                nib.save(img, save_path_realB)
-
-                img = nib.Nifti1Image(reconstructed_volume_A.astype("float32"), np.eye(4)) 
-                nib.save(img, save_path_reconstructedA)
-                img = nib.Nifti1Image(reconstructed_volume_B.astype("float32"), np.eye(4)) 
-                nib.save(img, save_path_reconstructedB)
-
-                img = nib.Nifti1Image(synthetic_volume_A.astype("float32"), np.eye(4)) 
-                nib.save(img, save_path_syntheticB)
-                img = nib.Nifti1Image(synthetic_volume_B.astype("float32"), np.eye(4)) 
-                nib.save(img, save_path_syntheticA)
-
-    def save_tmp_images(self, real_volume_A, real_volume_B, synthetic_volume_A, synthetic_volume_B):
-        try:
-            reconstructed_volume_A = self.G_B2A.predict(synthetic_volume_B[np.newaxis])[0]
-            reconstructed_volume_B = self.G_A2B.predict(synthetic_volume_A[np.newaxis])[0]
-
-            real_image_A = real_volume_A[:,:,self.tmp_img_z_A,:]
-            real_image_B = real_volume_B[:,:,self.tmp_img_z_B,:]
-            synthetic_image_A = synthetic_volume_A[:,:,self.tmp_img_z_A,:]
-            synthetic_image_B = synthetic_volume_B[:,:,self.tmp_img_z_B,:]
-            reconstructed_image_A = reconstructed_volume_A[:,:,self.tmp_img_z_A,:]
-            reconstructed_image_B = reconstructed_volume_B[:,:,self.tmp_img_z_B,:]
-
-            max_channels = max(self.channels_A, self.channels_B)
-
-            if max_channels <= 3:
-                # Add dimensions if A and B have different number of channels
-                if self.channels_A < self.channels_B:
-                    real_image_A = np.tile(real_image_A, [1,1,self.channels_B])
-                    synthetic_image_A = np.tile(synthetic_image_A, [1,1,self.channels_B])
-                    reconstructed_image_A = np.tile(reconstructed_image_A, [1,1,self.channels_B])
-                elif self.channels_B < self.channels_A:
-                    real_image_B = np.tile(real_image_B, [1,1,self.channels_A])
-                    synthetic_image_B = np.tile(synthetic_image_B, [1,1,self.channels_A])
-                    reconstructed_image_B = np.tile(reconstructed_image_B, [1,1,self.channels_A])
-            
-                real_images = np.vstack((real_image_A, real_image_B))
-                synthetic_images = np.vstack((synthetic_image_B, synthetic_image_A))
-                reconstructed_images = np.vstack((reconstructed_image_A, reconstructed_image_B))
-
-                save_path = '{}/tmp.png'.format(self.out_dir)
-                self.join_and_save((real_images, synthetic_images, reconstructed_images), save_path)
-            else:
-                channel_difference = self.channels_A - self.channels_B
-
-                real_images_A = np.zeros((1,real_volume_A.shape[1]))
-                for channel in range(self.channels_A):
-                    real_images_A = np.vstack((real_images_A, real_image_A[:,:,channel]))
-
-                if channel_difference < 0:
-                    for channel in range(-channel_difference):
-                        real_images_A = np.vstack((real_images_A, np.zeros((real_volume_A.shape[0],real_volume_A.shape[1])) ))
-                
-                synthetic_images_B = np.zeros((1,real_volume_A.shape[1]))
-                for channel in range(self.channels_B):
-                    synthetic_images_B = np.vstack((synthetic_images_B, synthetic_image_B[:,:,channel]))
-                
-                if channel_difference > 0:
-                    for channel in range(channel_difference):
-                        synthetic_images_B = np.vstack((synthetic_images_B, np.zeros((real_volume_A.shape[0],real_volume_A.shape[1])) ))
-
-                reconstructed_images_A = np.zeros((1,real_volume_A.shape[1]))
-                for channel in range(self.channels_A):
-                    reconstructed_images_A = np.vstack((reconstructed_images_A, reconstructed_image_A[:,:,channel]))
-
-                if channel_difference < 0:
-                    for channel in range(-channel_difference):
-                        reconstructed_images_A = np.vstack((reconstructed_images_A, np.zeros((real_volume_A.shape[0],real_volume_A.shape[1])) ))
-            
-                save_path = '{}/tmp_A2B.png'.format(self.out_dir)
-                real_images_A = real_images_A[:,:,np.newaxis]
-                synthetic_images_B = synthetic_images_B[:,:,np.newaxis]
-                reconstructed_images_A = reconstructed_images_A[:,:,np.newaxis]
-                self.join_and_save((real_images_A, synthetic_images_B, reconstructed_images_A), save_path)
-
-
-
-
-                real_images_B = np.zeros((1,real_volume_A.shape[1]))
-                for channel in range(self.channels_B):
-                    real_images_B = np.vstack((real_images_B, real_image_B[:,:,channel]))
-
-                if channel_difference > 0:
-                    for channel in range(channel_difference):
-                        real_images_B = np.vstack((real_images_B, np.zeros((real_volume_A.shape[0],real_volume_A.shape[1])) ))
-                
-                synthetic_images_A = np.zeros((1,real_volume_A.shape[1]))
-                for channel in range(self.channels_A):
-                    synthetic_images_A = np.vstack((synthetic_images_A, synthetic_image_A[:,:,channel]))
-                
-                if channel_difference < 0:
-                    for channel in range(-channel_difference):
-                        synthetic_images_A = np.vstack((synthetic_images_A, np.zeros((real_volume_A.shape[0],real_volume_A.shape[1])) ))
-
-                reconstructed_images_B = np.zeros((1,real_volume_A.shape[1]))
-                for channel in range(self.channels_B):
-                    reconstructed_images_B = np.vstack((reconstructed_images_B, reconstructed_image_B[:,:,channel]))
-
-                if channel_difference > 0:
-                    for channel in range(channel_difference):
-                        reconstructed_images_B = np.vstack((reconstructed_images_B, np.zeros((real_volume_A.shape[0],real_volume_A.shape[1])) ))
-            
-                save_path = '{}/tmp_B2A.png'.format(self.out_dir)
-                real_images_B = real_images_B[:,:,np.newaxis]
-                synthetic_images_A = synthetic_images_A[:,:,np.newaxis]
-                reconstructed_images_B = reconstructed_images_B[:,:,np.newaxis]
-                self.join_and_save((real_images_B, synthetic_images_A, reconstructed_images_B), save_path)
-
-        except: # Ignore if file is open
-            pass
+#===============================================================================
+# Learning rates
 
     def get_lr_linear_decay_rate(self):
         # Calculate decay rates
@@ -842,6 +565,175 @@ class CycleGAN():
         # print(K.get_value(model.optimizer.lr))
         K.set_value(model.optimizer.lr, new_lr)
 
+#===============================================================================
+# Image and model output
+
+    def save_tmp_images(self, real_volume_A, real_volume_B, synthetic_volume_A, synthetic_volume_B):
+        try:
+            reconstructed_volume_A = self.G_B2A.predict(synthetic_volume_B[np.newaxis])[0]
+            reconstructed_volume_B = self.G_A2B.predict(synthetic_volume_A[np.newaxis])[0]
+
+            real_image_A = real_volume_A[:,:,self.tmp_img_z_A,:].transpose((2,0,1))
+            real_image_B = real_volume_B[:,:,self.tmp_img_z_B,:].transpose((2,0,1))
+            synthetic_image_A = synthetic_volume_A[:,:,self.tmp_img_z_A,:].transpose((2,0,1))
+            synthetic_image_B = synthetic_volume_B[:,:,self.tmp_img_z_B,:].transpose((2,0,1))
+            reconstructed_image_A = reconstructed_volume_A[:,:,self.tmp_img_z_A,:].transpose((2,0,1))
+            reconstructed_image_B = reconstructed_volume_B[:,:,self.tmp_img_z_B,:].transpose((2,0,1))
+
+            length_A = self.vol_shape_A[0]*self.channels_A
+            length_B = self.vol_shape_B[0]*self.channels_B
+            width = self.vol_shape_A[1]
+            length_max = np.maximum(length_A, length_B)
+
+            real_images_A = np.zeros((length_max, width))
+            real_images_A[:length_A,:] = np.reshape(real_image_A, (length_A, width))
+
+            synthetic_images_B = np.zeros((length_max, width))
+            synthetic_images_B[:length_B,:] = np.reshape(synthetic_image_B, (length_B, width))
+
+            reconstructed_images_A = np.zeros((length_max, width))
+            reconstructed_images_A[:length_A,:] = np.reshape(reconstructed_image_A, (length_A, width))
+
+            save_path = '{}/tmp_A2B.png'.format(self.out_dir)
+            self.join_and_save((real_images_A, synthetic_images_B, reconstructed_images_A), save_path)
+
+
+            real_images_B = np.zeros((length_max, width))
+            real_images_B[:length_B,:] = np.reshape(real_image_B, (length_B, width))
+
+            synthetic_images_A = np.zeros((length_max, width))
+            synthetic_images_A[:length_A,:] = np.reshape(synthetic_image_A, (length_A, width))
+
+            reconstructed_images_B = np.zeros((length_max, width))
+            reconstructed_images_B[:length_B,:] = np.reshape(reconstructed_image_B, (length_B, width))
+
+            save_path = '{}/tmp_B2A.png'.format(self.out_dir)
+            self.join_and_save((real_images_B, synthetic_images_A, reconstructed_images_B), save_path)
+        except: # Ignore if file is open
+            print('???')
+            pass
+
+    def join_and_save(self, images, save_path):
+        # Join images
+        image = np.hstack(images)
+
+        # Save images
+        mpimage.imsave(save_path, image, vmin=-1, vmax=1, cmap='gray')
+
+    def save_epoch_volumes(self, epoch, num_saved_volumes=1):
+        # Save training volumes
+        nr_train_vol_A = self.A_train.shape[0]
+        nr_train_vol_B = self.B_train.shape[0]
+
+        rand_ind_A = np.random.randint(nr_train_vol_A)
+        rand_ind_B = np.random.randint(nr_train_vol_B)
+
+        real_volume_A = self.A_train[rand_ind_A]
+        real_volume_B = self.B_train[rand_ind_B]
+        synthetic_volume_B = self.G_A2B.predict(real_volume_A[np.newaxis])[0]
+        synthetic_volume_A = self.G_B2A.predict(real_volume_B[np.newaxis])[0]
+        reconstructed_volume_A = self.G_B2A.predict(synthetic_volume_B[np.newaxis])[0]
+        reconstructed_volume_B = self.G_A2B.predict(synthetic_volume_A[np.newaxis])[0]
+
+        save_path_realA = '{}/train_A/epoch{}_realA.nii.gz'.format(self.out_dir_volumes, epoch)
+        save_path_realB = '{}/train_B/epoch{}_realB.nii.gz'.format(self.out_dir_volumes, epoch)
+
+        save_path_syntheticB = '{}/train_A/epoch{}_syntheticB.nii.gz'.format(self.out_dir_volumes, epoch)
+        save_path_syntheticA = '{}/train_B/epoch{}_syntheticA.nii.gz'.format(self.out_dir_volumes, epoch)
+
+        save_path_reconstructedA = '{}/train_A/epoch{}_reconstructedA.nii.gz'.format(self.out_dir_volumes, epoch)
+        save_path_reconstructedB = '{}/train_B/epoch{}_reconstructedB.nii.gz'.format(self.out_dir_volumes, epoch)
+
+        img = nib.Nifti1Image(real_volume_A.astype("float32"), np.eye(4))
+        nib.save(img, save_path_realA)
+        img = nib.Nifti1Image(real_volume_B.astype("float32"), np.eye(4))
+        nib.save(img, save_path_realB)
+
+        img = nib.Nifti1Image(synthetic_volume_B.astype("float32"), np.eye(4))
+        nib.save(img, save_path_syntheticB)
+        img = nib.Nifti1Image(synthetic_volume_A.astype("float32"), np.eye(4))
+        nib.save(img, save_path_syntheticA)
+
+        img = nib.Nifti1Image(reconstructed_volume_A.astype("float32"), np.eye(4))
+        nib.save(img, save_path_reconstructedA)
+        img = nib.Nifti1Image(reconstructed_volume_B.astype("float32"), np.eye(4))
+        nib.save(img, save_path_reconstructedB)
+
+        if self.paired_data:
+            real_volume_Ab = self.B_train[rand_ind_A]
+            real_volume_Ba = self.A_train[rand_ind_B]
+
+            save_path_realAb = '{}/train_A/epoch{}_realAb.nii.gz'.format(self.out_dir_volumes, epoch)
+            save_path_realBa = '{}/train_B/epoch{}_realBa.nii.gz'.format(self.out_dir_volumes, epoch)
+
+            img = nib.Nifti1Image(real_volume_Ab.astype("float32"), np.eye(4))
+            nib.save(img, save_path_realAb)
+            img = nib.Nifti1Image(real_volume_Ba.astype("float32"), np.eye(4))
+            nib.save(img, save_path_realBa)
+
+        # Save test volumes
+        nr_test_vol_A = self.A_test.shape[0]
+        nr_test_vol_B = self.B_test.shape[0]
+
+        rand_ind_A = np.random.randint(nr_test_vol_A)
+        rand_ind_B = np.random.randint(nr_test_vol_B)
+
+        real_volume_A = self.A_train[rand_ind_A]
+        real_volume_B = self.B_train[rand_ind_B]
+        synthetic_volume_B = self.G_A2B.predict(real_volume_A[np.newaxis])[0]
+        synthetic_volume_A = self.G_B2A.predict(real_volume_B[np.newaxis])[0]
+        reconstructed_volume_A = self.G_B2A.predict(synthetic_volume_B[np.newaxis])[0]
+        reconstructed_volume_B = self.G_A2B.predict(synthetic_volume_A[np.newaxis])[0]
+
+        save_path_realA = '{}/test_A/epoch{}_realA.nii.gz'.format(self.out_dir_volumes, epoch)
+        save_path_realB = '{}/test_B/epoch{}_realB.nii.gz'.format(self.out_dir_volumes, epoch)
+
+        save_path_syntheticB = '{}/test_A/epoch{}_syntheticB.nii.gz'.format(self.out_dir_volumes, epoch)
+        save_path_syntheticA = '{}/test_B/epoch{}_syntheticA.nii.gz'.format(self.out_dir_volumes, epoch)
+
+        save_path_reconstructedA = '{}/test_A/epoch{}_reconstructedA.nii.gz'.format(self.out_dir_volumes, epoch)
+        save_path_reconstructedB = '{}/test_B/epoch{}_reconstructedB.nii.gz'.format(self.out_dir_volumes, epoch)
+
+        img = nib.Nifti1Image(real_volume_A.astype("float32"), np.eye(4))
+        nib.save(img, save_path_realA)
+        img = nib.Nifti1Image(real_volume_B.astype("float32"), np.eye(4))
+        nib.save(img, save_path_realB)
+
+        img = nib.Nifti1Image(synthetic_volume_B.astype("float32"), np.eye(4))
+        nib.save(img, save_path_syntheticB)
+        img = nib.Nifti1Image(synthetic_volume_A.astype("float32"), np.eye(4))
+        nib.save(img, save_path_syntheticA)
+
+        img = nib.Nifti1Image(reconstructed_volume_A.astype("float32"), np.eye(4))
+        nib.save(img, save_path_reconstructedA)
+        img = nib.Nifti1Image(reconstructed_volume_B.astype("float32"), np.eye(4))
+        nib.save(img, save_path_reconstructedB)
+
+        if self.paired_data:
+            real_volume_Ab = self.B_train[rand_ind_A]
+            real_volume_Ba = self.A_train[rand_ind_B]
+
+            save_path_realAb = '{}/test_A/epoch{}_realAb.nii.gz'.format(self.out_dir_volumes, epoch)
+            save_path_realBa = '{}/test_B/epoch{}_realBa.nii.gz'.format(self.out_dir_volumes, epoch)
+
+            img = nib.Nifti1Image(real_volume_Ab.astype("float32"), np.eye(4))
+            nib.save(img, save_path_realAb)
+            img = nib.Nifti1Image(real_volume_Ba.astype("float32"), np.eye(4))
+            nib.save(img, save_path_realBa)
+
+    def save_model(self, model, epoch):
+        weights_path = '{}/{}_epoch_{}.hdf5'.format(self.out_dir_models, model.name, epoch)
+        model.save_weights(weights_path)
+
+        model_path = '{}/{}_epoch_{}.json'.format(self.out_dir_models, model.name, epoch)
+        model_json_string = model.to_json()
+        with open(model_path, 'w') as outfile:
+            outfile.write(model_json_string)
+        print('{} has been saved in saved_models/{}/'.format(model.name, self.date_time))
+
+#===============================================================================
+# Other output
+
     def print_ETA(self, start_time, epoch, nr_vol_per_epoch, loop_index):
         passed_time = time.time() - start_time
 
@@ -853,20 +745,6 @@ class CycleGAN():
         passed_time_string = str(datetime.timedelta(seconds=round(passed_time)))
         eta_string = str(datetime.timedelta(seconds=eta))
         print('Elapsed time', passed_time_string, ': ETA in', eta_string)
-
-
-#===============================================================================
-# Save and load
-
-    def save_model(self, model, epoch):
-        weights_path = '{}/{}_epoch_{}.hdf5'.format(self.out_dir_models, model.name, epoch)
-        model.save_weights(weights_path)
-
-        model_path = '{}/{}_epoch_{}.json'.format(self.out_dir_models, model.name, epoch)
-        model_json_string = model.to_json()
-        with open(model_path, 'w') as outfile:
-            outfile.write(model_json_string)
-        print('{} has been saved in saved_models/{}/'.format(model.name, self.date_time))
 
     def write_loss_data_to_file(self, history):
         keys = sorted(history.keys())
@@ -911,6 +789,7 @@ class CycleGAN():
 
         with open('{}/metadata.json'.format(self.out_dir), 'w') as outfile:
             json.dump(metadata, outfile, sort_keys=True)
+
 
 # reflection padding taken from
 # https://github.com/fastai/courses/blob/master/deeplearning2/neural-style.ipynb
